@@ -9,8 +9,8 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const args = parseArgs(process.argv.slice(2));
 
-const inputDir = path.resolve(process.cwd(), args.input ?? 'output');
-const pdfDir = path.resolve(process.cwd(), args.output ?? path.join(inputDir, 'pdf'));
+const inputDir = path.resolve(process.cwd(), args.input ?? 'input');
+const pdfDir = path.resolve(process.cwd(), args.output ?? 'output');
 const htmlDir = path.resolve(process.cwd(), args.html ?? path.join(pdfDir, 'html'));
 const chromePath = args.chromePath ?? '/usr/bin/google-chrome';
 const mermaidVersion = require('mermaid/package.json').version;
