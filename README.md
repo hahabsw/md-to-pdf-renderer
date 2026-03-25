@@ -43,19 +43,22 @@ When you run the renderer:
 From the tool directory:
 
 ```bash
-cd tools/md-to-pdf-renderer
 npm install
 ```
 
 ### Usage
+
+Quick start with `npx`:
+
+```bash
+npx md-to-pdf-renderer
+```
 
 Show CLI help:
 
 ```bash
 npx md-to-pdf-renderer --help
 ```
-
-Run with `npx` after publishing the package:
 
 ```bash
 npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientation portrait --log-file
@@ -64,20 +67,7 @@ npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientati
 Run from the repository root:
 
 ```bash
-node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
-```
-
-Run through the compatibility wrapper from the repository root:
-
-```bash
-node scripts/render-output-pdfs.mjs
-```
-
-Run directly from the tool directory:
-
-```bash
-cd tools/md-to-pdf-renderer
-npm run render -- --input ../../input --output ../../output --paper-size Letter --orientation landscape --log-file
+node src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
 ```
 
 ### CLI options
@@ -91,10 +81,6 @@ npm run render -- --input ../../input --output ../../output --paper-size Letter 
 | `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |
 | `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
 | `--chrome-path` | Optional path to a custom Chrome/Chromium executable | Bundled Puppeteer browser |
-
-### Publish for npx
-
-To make `npx md-to-pdf-renderer` work for other users, publish this package to npm as a public package.
 
 ### Output structure
 
@@ -177,19 +163,22 @@ output/
 도구 디렉터리에서 실행:
 
 ```bash
-cd tools/md-to-pdf-renderer
 npm install
 ```
 
 ### 사용 방법
+
+`npx` 빠른 시작:
+
+```bash
+npx md-to-pdf-renderer
+```
 
 CLI 도움말 보기:
 
 ```bash
 npx md-to-pdf-renderer --help
 ```
-
-패키지를 npm에 공개 배포한 뒤 `npx`로 실행:
 
 ```bash
 npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientation portrait --log-file
@@ -198,20 +187,7 @@ npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientati
 저장소 루트에서 직접 실행:
 
 ```bash
-node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
-```
-
-저장소 루트의 호환 래퍼로 실행:
-
-```bash
-node scripts/render-output-pdfs.mjs
-```
-
-도구 디렉터리에서 직접 실행:
-
-```bash
-cd tools/md-to-pdf-renderer
-npm run render -- --input ../../input --output ../../output --paper-size Letter --orientation landscape --log-file
+node src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
 ```
 
 ### CLI 옵션
@@ -225,10 +201,6 @@ npm run render -- --input ../../input --output ../../output --paper-size Letter 
 | `--orientation` | 출력 방향: `portrait` 또는 `landscape` | `portrait` |
 | `--log-file` | 진행 로그를 `<output>/render.log`에 저장 | 비활성화 |
 | `--chrome-path` | 사용자 지정 Chrome/Chromium 실행 파일 경로, 선택 사항 | Puppeteer 내장 브라우저 |
-
-### npx 배포
-
-다른 사용자가 `npx md-to-pdf-renderer`로 실행할 수 있으려면 이 패키지를 npm에 공개 패키지로 배포해야 합니다.
 
 ### 출력 구조
 
