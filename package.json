@@ -18,8 +18,10 @@
         "render": "node src/render-pdfs.mjs"
     },
     "dependencies": {
+        "katex": "^0.16.42",
         "markdown-it": "^14.1.0",
         "markdown-it-footnote": "^4.0.0",
+        "markdown-it-katex": "^2.0.3",
         "markdown-it-task-lists": "^2.1.1",
         "mermaid": "^11.13.0",
         "puppeteer": "^24.40.0"

@@ -13,6 +13,8 @@ It is designed for documentation export workflows where the same Markdown source
 - Styled code blocks and plain-text blocks
 - Tables, blockquotes, and general document formatting
 - Task lists, footnotes, and GitHub-style callouts
+- `[[TOC]]` placeholder based table of contents
+- Inline and block math rendering with KaTeX
 - A generated manifest file for produced PDFs
 
 ### What it does
@@ -37,7 +39,9 @@ When you run the renderer:
 
 - `markdown-it`
 - `markdown-it-footnote`
+- `markdown-it-katex`
 - `markdown-it-task-lists`
+- `katex`
 - `mermaid`
 - `puppeteer`
 
@@ -118,6 +122,8 @@ output/
 - Task lists using `- [x]` and `- [ ]` are rendered with checkbox styling.
 - Footnotes using `[^name]` syntax are rendered at the end of the document.
 - GitHub-style callouts such as `> [!NOTE]` and `> [!WARNING]` are rendered as callout cards.
+- `[[TOC]]` is replaced with a generated table of contents linking to document headings.
+- Inline math using `$...$` and block math using `$$...$$` are rendered with KaTeX.
 - The generated PDFs use print CSS and support `--paper-size` plus `--orientation`.
 - Render progress is always printed to the console.
 - `<output>/render.log` is only written when `--log-file` is enabled.
@@ -139,6 +145,8 @@ output/
 - 코드 블록 및 일반 텍스트 블록 스타일링
 - 표, 인용문, 일반 문단 포맷팅
 - 체크리스트, 각주, GitHub 스타일 callout
+- `[[TOC]]` 플레이스홀더 기반 자동 목차
+- KaTeX 기반 인라인/블록 수식 렌더링
 - 생성된 PDF 목록용 매니페스트 파일 출력
 
 ### 하는 일
@@ -163,7 +171,9 @@ output/
 
 - `markdown-it`
 - `markdown-it-footnote`
+- `markdown-it-katex`
 - `markdown-it-task-lists`
+- `katex`
 - `mermaid`
 - `puppeteer`
 
@@ -244,6 +254,8 @@ output/
 - `- [x]`, `- [ ]` 형식의 체크리스트를 체크박스 스타일로 렌더링합니다.
 - `[^name]` 형식의 각주를 문서 하단에 렌더링합니다.
 - `> [!NOTE]`, `> [!WARNING]` 같은 GitHub 스타일 callout을 카드 형태로 렌더링합니다.
+- `[[TOC]]`는 문서 heading으로 연결되는 자동 목차로 치환됩니다.
+- `$...$` 인라인 수식과 `$$...$$` 블록 수식을 KaTeX로 렌더링합니다.
 - 생성되는 PDF는 print CSS를 사용하며 `--paper-size`, `--orientation`으로 크기와 방향을 바꿀 수 있습니다.
 - 변환 진행 상태는 항상 콘솔에 출력됩니다.
 - `<output>/render.log`는 `--log-file` 옵션을 준 경우에만 생성됩니다.

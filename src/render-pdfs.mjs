@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import MarkdownIt from 'markdown-it';
 import markdownItFootnote from 'markdown-it-footnote';
+import markdownItKatex from 'markdown-it-katex';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import puppeteer from 'puppeteer';
 
@@ -23,6 +24,7 @@ const renderLogPath = path.join(pdfDir, 'render.log');
 const logToFile = Boolean(args.logFile);
 const paperOrientation = resolvePaperOrientation(args.orientation);
 const paperLayout = resolvePaperLayout(args.paperSize, paperOrientation);
+const katexCssHref = pathToFileURL(require.resolve('katex/dist/katex.min.css')).href;
 const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 
@@ -33,12 +35,14 @@ const md = new MarkdownIt({
 });
 
 md.use(markdownItFootnote);
+md.use(markdownItKatex);
 md.use(markdownItTaskLists, {
     enabled: true,
     label: true,
     labelAfter: true,
 });
 md.use(calloutPlugin);
+md.use(tableOfContentsPlugin);
 
 md.renderer.rules.fence = (tokens, idx) => {
     const token = tokens[idx];
@@ -423,6 +427,72 @@ function buildTemplateCss() {
         color: #c2410c;
     }
 
+    .toc {
+        margin: 5mm 0 7mm;
+        padding: 4.5mm 5mm 4mm;
+        border: 0.35mm solid #cbd5e1;
+        border-radius: 2.6mm;
+        background: #f8fafc;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .toc-title {
+        margin: 0 0 2.2mm;
+        color: #0f172a;
+        font-size: 9pt;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .toc-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .toc-item {
+        margin: 0;
+        padding: 0;
+    }
+
+    .toc-item + .toc-item {
+        margin-top: 1.2mm;
+    }
+
+    .toc-level-2 {
+        padding-left: 0;
+    }
+
+    .toc-level-3 {
+        padding-left: 4mm;
+    }
+
+    .toc-level-4 {
+        padding-left: 8mm;
+    }
+
+    .toc a {
+        color: #1d4ed8;
+        text-decoration: none;
+    }
+
+    .toc a:hover {
+        text-decoration: underline;
+    }
+
+    .katex-display {
+        margin: 5mm 0 7mm;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 2mm 0;
+    }
+
+    .katex {
+        font-size: 1.02em;
+    }
+
     img {
         display: block;
         max-width: 100%;
@@ -580,6 +650,7 @@ function buildHtml({ markdown, title, baseHref }) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
     <base href="${escapeHtml(baseHref)}" />
+    <link rel="stylesheet" href="${escapeHtml(katexCssHref)}" />
     <style>${buildTemplateCss()}</style>
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
@@ -841,6 +912,133 @@ function findMatchingBlockquoteClose(tokens, startIndex) {
     }
 
     return -1;
+}
+
+function tableOfContentsPlugin(markdown) {
+    markdown.core.ruler.push('table_of_contents', (state) => {
+        const headings = collectHeadings(state.tokens);
+        const tocItems = selectTocHeadings(headings);
+        const tocMarkup = buildTocMarkup(tocItems);
+
+        for (let i = 0; i < state.tokens.length - 2; i += 1) {
+            const paragraphOpen = state.tokens[i];
+            const inlineToken = state.tokens[i + 1];
+            const paragraphClose = state.tokens[i + 2];
+
+            if (
+                paragraphOpen.type !== 'paragraph_open'
+                || inlineToken.type !== 'inline'
+                || paragraphClose.type !== 'paragraph_close'
+            ) {
+                continue;
+            }
+
+            if (inlineToken.content.trim() !== '[[TOC]]') {
+                continue;
+            }
+
+            const htmlBlock = new state.Token('html_block', '', 0);
+            htmlBlock.content = `${tocMarkup}\n`;
+            state.tokens.splice(i, 3, htmlBlock);
+        }
+    });
+}
+
+function collectHeadings(tokens) {
+    const headings = [];
+    const slugCounts = new Map();
+
+    for (let i = 0; i < tokens.length - 1; i += 1) {
+        const openToken = tokens[i];
+        const inlineToken = tokens[i + 1];
+
+        if (openToken.type !== 'heading_open' || inlineToken.type !== 'inline') {
+            continue;
+        }
+
+        const level = Number(openToken.tag.slice(1));
+        const title = extractInlineText(inlineToken).trim();
+
+        if (!title) {
+            continue;
+        }
+
+        const slug = uniqueSlug(slugify(title), slugCounts);
+        openToken.attrSet('id', slug);
+        headings.push({ level, slug, title });
+    }
+
+    return headings;
+}
+
+function selectTocHeadings(headings) {
+    const preferred = headings.filter((heading) => heading.level >= 2 && heading.level <= 4);
+
+    if (preferred.length > 0) {
+        return preferred;
+    }
+
+    return headings.filter((heading) => heading.level >= 1 && heading.level <= 3);
+}
+
+function buildTocMarkup(items) {
+    if (items.length === 0) {
+        return [
+            '<nav class="toc" aria-label="Table of contents">',
+            '  <p class="toc-title">Contents</p>',
+            '  <p>No headings available.</p>',
+            '</nav>',
+        ].join('\n');
+    }
+
+    const lines = [
+        '<nav class="toc" aria-label="Table of contents">',
+        '  <p class="toc-title">Contents</p>',
+        '  <ol class="toc-list">',
+    ];
+
+    for (const item of items) {
+        const levelClass = `toc-level-${Math.min(Math.max(item.level, 2), 4)}`;
+        lines.push(`    <li class="toc-item ${levelClass}"><a href="#${escapeHtml(item.slug)}">${escapeHtml(item.title)}</a></li>`);
+    }
+
+    lines.push('  </ol>');
+    lines.push('</nav>');
+    return lines.join('\n');
+}
+
+function extractInlineText(token) {
+    if (!Array.isArray(token.children) || token.children.length === 0) {
+        return token.content ?? '';
+    }
+
+    return token.children
+        .filter((child) => child.type === 'text' || child.type === 'code_inline')
+        .map((child) => child.content)
+        .join('');
+}
+
+function slugify(value) {
+    return value
+        .toLowerCase()
+        .trim()
+        .replace(/[`*_~[\]()!]/g, '')
+        .replace(/[^\p{L}\p{N}\s-]/gu, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        || 'section';
+}
+
+function uniqueSlug(baseSlug, slugCounts) {
+    const count = slugCounts.get(baseSlug) ?? 0;
+    slugCounts.set(baseSlug, count + 1);
+
+    if (count === 0) {
+        return baseSlug;
+    }
+
+    return `${baseSlug}-${count + 1}`;
 }
 
 function toTitle(fileName) {
