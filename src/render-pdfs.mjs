@@ -9,11 +9,18 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const args = parseArgs(process.argv.slice(2));
 
+if (args.help) {
+    printHelp();
+    process.exit(0);
+}
+
 const inputDir = path.resolve(process.cwd(), args.input ?? '.');
 const pdfDir = path.resolve(process.cwd(), args.output ?? 'output');
 const htmlDir = path.resolve(process.cwd(), args.html ?? path.join(pdfDir, 'html'));
 const renderLogPath = path.join(pdfDir, 'render.log');
-const paperSize = resolvePaperSize(args.paperSize);
+const logToFile = Boolean(args.logFile);
+const paperOrientation = resolvePaperOrientation(args.orientation);
+const paperLayout = resolvePaperLayout(args.paperSize, paperOrientation);
 const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 
@@ -87,7 +94,7 @@ function buildTemplateCss() {
     }
 
     .page-shell {
-        width: min(${paperSize.pageWidth}, 100%);
+        width: min(${paperLayout.pageWidth}, 100%);
         margin: 0 auto;
         padding: 10mm 0 12mm;
     }
@@ -316,7 +323,7 @@ function buildTemplateCss() {
     }
 
     @page {
-        size: ${paperSize.cssValue};
+        size: ${paperLayout.cssValue};
         margin: 12mm;
     }
 
@@ -343,10 +350,13 @@ function buildTemplateCss() {
 
 await fs.mkdir(pdfDir, { recursive: true });
 await fs.mkdir(htmlDir, { recursive: true });
-await fs.writeFile(renderLogPath, '', 'utf8');
+
+if (logToFile) {
+    await fs.writeFile(renderLogPath, '', 'utf8');
+}
 
 await logProgress(
-    `Render started. input=${inputDir} output=${pdfDir} html=${htmlDir} paperSize=${paperSize.displayValue}`,
+    `Render started. input=${inputDir} output=${pdfDir} html=${htmlDir} paperSize=${paperLayout.sizeDisplayValue} orientation=${paperOrientation.displayValue} logFile=${logToFile ? renderLogPath : 'disabled'}`,
 );
 
 const manifest = [];
@@ -374,7 +384,6 @@ try {
         const html = buildHtml({
             markdown,
             title,
-            paperSize,
         });
         const baseName = fileName.replace(/\.md$/i, '');
         const htmlPath = path.join(htmlDir, `${baseName}.html`);
@@ -614,7 +623,11 @@ function formatDate(date) {
 
 async function logProgress(message) {
     const line = `[${new Date().toISOString()}] ${message}\n`;
-    await fs.appendFile(renderLogPath, line, 'utf8');
+
+    if (logToFile) {
+        await fs.appendFile(renderLogPath, line, 'utf8');
+    }
+
     console.log(message);
 }
 
@@ -626,22 +639,66 @@ function formatError(error) {
     return String(error);
 }
 
-function resolvePaperSize(value = 'A4') {
+function printHelp() {
+    const helpText = `
+md-to-pdf-renderer
+
+Convert top-level Markdown files in a directory into styled HTML and PDF files.
+
+Usage:
+  md-to-pdf-renderer [options]
+
+Options:
+  --input <dir>          Source Markdown directory. Default: current working directory
+  --output <dir>         PDF output directory. Default: output
+  --html <dir>           Intermediate HTML output directory. Default: <output>/html
+  --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
+  --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
+  --log-file             Write progress logs to <output>/render.log
+  --chrome-path <path>   Use a custom Chrome/Chromium executable instead of Puppeteer's bundled browser
+  --help, -h             Show this help message
+
+Examples:
+  md-to-pdf-renderer --output output
+  md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
+`;
+
+    process.stdout.write(helpText.trimStart());
+}
+
+function resolvePaperOrientation(value = 'portrait') {
+    const normalized = value.trim().toLowerCase();
+
+    if (normalized === 'portrait' || normalized === 'landscape') {
+        return {
+            cssValue: normalized,
+            displayValue: normalized,
+            isLandscape: normalized === 'landscape',
+        };
+    }
+
+    throw new Error(`Invalid orientation: ${value}. Use "portrait" or "landscape".`);
+}
+
+function resolvePaperLayout(value = 'A4', orientation = resolvePaperOrientation()) {
     const normalized = value.trim().replace(/\s+/g, ' ').toLowerCase();
     const knownSizes = {
-        a5: { cssValue: 'A5', pageWidth: '148mm', displayValue: 'A5' },
-        a4: { cssValue: 'A4', pageWidth: '210mm', displayValue: 'A4' },
-        'a4 landscape': { cssValue: 'A4 landscape', pageWidth: '297mm', displayValue: 'A4 landscape' },
-        a3: { cssValue: 'A3', pageWidth: '297mm', displayValue: 'A3' },
-        letter: { cssValue: 'Letter', pageWidth: '8.5in', displayValue: 'Letter' },
-        'letter landscape': { cssValue: 'Letter landscape', pageWidth: '11in', displayValue: 'Letter landscape' },
-        legal: { cssValue: 'Legal', pageWidth: '8.5in', displayValue: 'Legal' },
-        'legal landscape': { cssValue: 'Legal landscape', pageWidth: '14in', displayValue: 'Legal landscape' },
-        tabloid: { cssValue: 'Tabloid', pageWidth: '11in', displayValue: 'Tabloid' },
+        a5: { cssValue: 'A5', width: '148mm', height: '210mm', displayValue: 'A5' },
+        a4: { cssValue: 'A4', width: '210mm', height: '297mm', displayValue: 'A4' },
+        a3: { cssValue: 'A3', width: '297mm', height: '420mm', displayValue: 'A3' },
+        letter: { cssValue: 'Letter', width: '8.5in', height: '11in', displayValue: 'Letter' },
+        legal: { cssValue: 'Legal', width: '8.5in', height: '14in', displayValue: 'Legal' },
+        tabloid: { cssValue: 'Tabloid', width: '11in', height: '17in', displayValue: 'Tabloid' },
     };
 
     if (knownSizes[normalized]) {
-        return knownSizes[normalized];
+        const preset = knownSizes[normalized];
+
+        return {
+            cssValue: `${preset.cssValue} ${orientation.cssValue}`,
+            pageWidth: orientation.isLandscape ? preset.height : preset.width,
+            sizeDisplayValue: preset.displayValue,
+        };
     }
 
     const customSizeMatch = normalized.match(/^([0-9.]+(?:mm|cm|in))\s+([0-9.]+(?:mm|cm|in))$/);
@@ -650,16 +707,16 @@ function resolvePaperSize(value = 'A4') {
         const width = customSizeMatch[1];
         const height = customSizeMatch[2];
         return {
-            cssValue: `${width} ${height}`,
-            pageWidth: width,
-            displayValue: `${width} ${height}`,
+            cssValue: orientation.isLandscape ? `${height} ${width}` : `${width} ${height}`,
+            pageWidth: orientation.isLandscape ? height : width,
+            sizeDisplayValue: `${width} ${height}`,
         };
     }
 
     return {
-        cssValue: value,
-        pageWidth: '210mm',
-        displayValue: value,
+        cssValue: `${value} ${orientation.cssValue}`,
+        pageWidth: orientation.isLandscape ? '297mm' : '210mm',
+        sizeDisplayValue: value,
     };
 }
 
@@ -704,6 +761,11 @@ function parseArgs(argv) {
     for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i];
 
+        if (arg === '--help' || arg === '-h') {
+            parsed.help = true;
+            continue;
+        }
+
         if (arg === '--input') {
             parsed.input = argv[i + 1];
             i += 1;
@@ -731,6 +793,17 @@ function parseArgs(argv) {
         if (arg === '--paper-size') {
             parsed.paperSize = argv[i + 1];
             i += 1;
+            continue;
+        }
+
+        if (arg === '--orientation') {
+            parsed.orientation = argv[i + 1];
+            i += 1;
+            continue;
+        }
+
+        if (arg === '--log-file') {
+            parsed.logFile = true;
         }
     }
 

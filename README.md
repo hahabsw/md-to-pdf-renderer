@@ -49,16 +49,22 @@ npm install
 
 ### Usage
 
+Show CLI help:
+
+```bash
+npx md-to-pdf-renderer --help
+```
+
 Run with `npx` after publishing the package:
 
 ```bash
-npx md-to-pdf-renderer --input input --output output --paper-size A4
+npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientation portrait --log-file
 ```
 
 Run from the repository root:
 
 ```bash
-node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4
+node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
 ```
 
 Run through the compatibility wrapper from the repository root:
@@ -71,7 +77,7 @@ Run directly from the tool directory:
 
 ```bash
 cd tools/md-to-pdf-renderer
-npm run render -- --input ../../input --output ../../output --paper-size Letter
+npm run render -- --input ../../input --output ../../output --paper-size Letter --orientation landscape --log-file
 ```
 
 ### CLI options
@@ -82,6 +88,8 @@ npm run render -- --input ../../input --output ../../output --paper-size Letter
 | `--output` | Directory where PDF files are written | `output` |
 | `--html` | Directory where intermediate HTML files are written | `<output>/html` |
 | `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
+| `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |
+| `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
 | `--chrome-path` | Optional path to a custom Chrome/Chromium executable | Bundled Puppeteer browser |
 
 ### Publish for npx
@@ -95,7 +103,7 @@ The tool generates:
 - `<output>/*.pdf`
 - `<html>/*.html`
 - `<output>/README.md`
-- `<output>/render.log`
+- `<output>/render.log` when `--log-file` is enabled
 
 Example:
 
@@ -118,8 +126,9 @@ output/
 - If no top-level heading exists, the file name is converted into a readable title.
 - Mermaid fences using ```` ```mermaid ```` are rendered as diagrams.
 - Code fences using ```` ```text ```` are rendered with a plain text oriented layout.
-- The generated PDFs use print CSS and can be resized with `--paper-size`.
-- Render progress is recorded in `<output>/render.log`.
+- The generated PDFs use print CSS and support `--paper-size` plus `--orientation`.
+- Render progress is always printed to the console.
+- `<output>/render.log` is only written when `--log-file` is enabled.
 - Missing, empty, or invalid input directories fail with a clear error message.
 
 ### Compatibility note
@@ -174,16 +183,22 @@ npm install
 
 ### 사용 방법
 
+CLI 도움말 보기:
+
+```bash
+npx md-to-pdf-renderer --help
+```
+
 패키지를 npm에 공개 배포한 뒤 `npx`로 실행:
 
 ```bash
-npx md-to-pdf-renderer --input input --output output --paper-size A4
+npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientation portrait --log-file
 ```
 
 저장소 루트에서 직접 실행:
 
 ```bash
-node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4
+node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
 ```
 
 저장소 루트의 호환 래퍼로 실행:
@@ -196,7 +211,7 @@ node scripts/render-output-pdfs.mjs
 
 ```bash
 cd tools/md-to-pdf-renderer
-npm run render -- --input ../../input --output ../../output --paper-size Letter
+npm run render -- --input ../../input --output ../../output --paper-size Letter --orientation landscape --log-file
 ```
 
 ### CLI 옵션
@@ -207,6 +222,8 @@ npm run render -- --input ../../input --output ../../output --paper-size Letter
 | `--output` | PDF 출력 디렉터리 | `output` |
 | `--html` | 중간 HTML 출력 디렉터리 | `<output>/html` |
 | `--paper-size` | `A4`, `Letter`, `Legal`, `A3`, `210mm 297mm` 같은 출력 용지 크기 | `A4` |
+| `--orientation` | 출력 방향: `portrait` 또는 `landscape` | `portrait` |
+| `--log-file` | 진행 로그를 `<output>/render.log`에 저장 | 비활성화 |
 | `--chrome-path` | 사용자 지정 Chrome/Chromium 실행 파일 경로, 선택 사항 | Puppeteer 내장 브라우저 |
 
 ### npx 배포
@@ -220,7 +237,7 @@ npm run render -- --input ../../input --output ../../output --paper-size Letter
 - `<output>/*.pdf`
 - `<html>/*.html`
 - `<output>/README.md`
-- `<output>/render.log`
+- `<output>/render.log` (`--log-file` 사용 시)
 
 예시:
 
@@ -243,8 +260,9 @@ output/
 - 최상위 제목이 없으면 파일명을 사람이 읽기 쉬운 제목으로 변환합니다.
 - ```` ```mermaid ```` 코드 펜스는 다이어그램으로 렌더링됩니다.
 - ```` ```text ```` 코드 펜스는 일반 텍스트용 레이아웃으로 렌더링됩니다.
-- 생성되는 PDF는 print CSS를 사용하며 `--paper-size`로 용지 크기를 바꿀 수 있습니다.
-- 변환 진행 상태는 `<output>/render.log`에 기록됩니다.
+- 생성되는 PDF는 print CSS를 사용하며 `--paper-size`, `--orientation`으로 크기와 방향을 바꿀 수 있습니다.
+- 변환 진행 상태는 항상 콘솔에 출력됩니다.
+- `<output>/render.log`는 `--log-file` 옵션을 준 경우에만 생성됩니다.
 - 입력 디렉터리가 없거나 비어 있거나 Markdown 파일이 없으면 명확한 오류로 종료됩니다.
 
 ### 호환성 참고
