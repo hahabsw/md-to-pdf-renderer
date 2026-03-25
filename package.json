@@ -1,15 +1,25 @@
 {
     "name": "md-to-pdf-renderer",
     "version": "0.1.0",
-    "private": true,
     "type": "module",
     "description": "Markdown to PDF renderer with Mermaid support",
+    "bin": {
+        "md-to-pdf-renderer": "./bin/md-to-pdf-renderer.mjs"
+    },
+    "files": [
+        "bin",
+        "src",
+        "README.md"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "render": "node src/render-pdfs.mjs"
     },
     "dependencies": {
         "markdown-it": "^14.1.0",
         "mermaid": "^11.13.0",
-        "puppeteer-core": "^24.40.0"
+        "puppeteer": "^24.40.0"
     }
 }

@@ -20,7 +20,7 @@ When you run the renderer:
 
 1. It scans the input directory for top-level `*.md` files.
 2. It converts each Markdown file into an intermediate HTML file.
-3. It opens that HTML in Chrome/Chromium through `puppeteer-core`.
+3. It opens that HTML in a bundled Puppeteer-managed browser.
 4. It renders Mermaid blocks before printing.
 5. It writes the final PDF files.
 6. It creates a `README.md` manifest inside the PDF output directory.
@@ -29,14 +29,14 @@ When you run the renderer:
 
 - Node.js
 - `npm install` for this tool directory
-- Chrome or Chromium executable available on the machine
+- No separate Chrome installation is required by default
 - Network access for Mermaid ESM loading from jsDelivr at render time
 
 ### Dependencies
 
 - `markdown-it`
 - `mermaid`
-- `puppeteer-core`
+- `puppeteer`
 
 ### Install
 
@@ -49,10 +49,16 @@ npm install
 
 ### Usage
 
+Run with `npx` after publishing the package:
+
+```bash
+npx md-to-pdf-renderer --input input --output output --paper-size A4
+```
+
 Run from the repository root:
 
 ```bash
-node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output
+node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4
 ```
 
 Run through the compatibility wrapper from the repository root:
@@ -65,17 +71,22 @@ Run directly from the tool directory:
 
 ```bash
 cd tools/md-to-pdf-renderer
-npm run render -- --input ../../input --output ../../output
+npm run render -- --input ../../input --output ../../output --paper-size Letter
 ```
 
 ### CLI options
 
 | Option | Description | Default |
 | ---- | ---- | ---- |
-| `--input` | Directory containing source Markdown files | `input` |
+| `--input` | Directory containing source Markdown files | Current working directory |
 | `--output` | Directory where PDF files are written | `output` |
 | `--html` | Directory where intermediate HTML files are written | `<output>/html` |
-| `--chrome-path` | Path to the Chrome/Chromium executable | `/usr/bin/google-chrome` |
+| `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
+| `--chrome-path` | Optional path to a custom Chrome/Chromium executable | Bundled Puppeteer browser |
+
+### Publish for npx
+
+To make `npx md-to-pdf-renderer` work for other users, publish this package to npm as a public package.
 
 ### Output structure
 
@@ -84,6 +95,7 @@ The tool generates:
 - `<output>/*.pdf`
 - `<html>/*.html`
 - `<output>/README.md`
+- `<output>/render.log`
 
 Example:
 
@@ -106,7 +118,9 @@ output/
 - If no top-level heading exists, the file name is converted into a readable title.
 - Mermaid fences using ```` ```mermaid ```` are rendered as diagrams.
 - Code fences using ```` ```text ```` are rendered with a plain text oriented layout.
-- The generated PDFs use print CSS with A4 page sizing.
+- The generated PDFs use print CSS and can be resized with `--paper-size`.
+- Render progress is recorded in `<output>/render.log`.
+- Missing, empty, or invalid input directories fail with a clear error message.
 
 ### Compatibility note
 
@@ -131,7 +145,7 @@ output/
 
 1. 입력 디렉터리에서 최상위 `*.md` 파일을 찾습니다.
 2. 각 Markdown 파일을 중간 HTML 파일로 변환합니다.
-3. `puppeteer-core`를 통해 Chrome/Chromium에서 해당 HTML을 엽니다.
+3. Puppeteer가 관리하는 내장 브라우저에서 해당 HTML을 엽니다.
 4. PDF 출력 전에 Mermaid 블록을 렌더링합니다.
 5. 최종 PDF 파일을 생성합니다.
 6. PDF 출력 디렉터리에 결과 목록용 `README.md`를 생성합니다.
@@ -140,14 +154,14 @@ output/
 
 - Node.js
 - 이 도구 디렉터리에서 `npm install` 수행
-- 실행 가능한 Chrome 또는 Chromium 설치
+- 기본적으로 별도 Chrome 설치가 필요하지 않음
 - 렌더링 시 Mermaid ESM을 jsDelivr에서 불러오기 위한 네트워크 접근
 
 ### 의존성
 
 - `markdown-it`
 - `mermaid`
-- `puppeteer-core`
+- `puppeteer`
 
 ### 설치
 
@@ -160,10 +174,16 @@ npm install
 
 ### 사용 방법
 
+패키지를 npm에 공개 배포한 뒤 `npx`로 실행:
+
+```bash
+npx md-to-pdf-renderer --input input --output output --paper-size A4
+```
+
 저장소 루트에서 직접 실행:
 
 ```bash
-node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output
+node tools/md-to-pdf-renderer/src/render-pdfs.mjs --input input --output output --paper-size A4
 ```
 
 저장소 루트의 호환 래퍼로 실행:
@@ -176,17 +196,22 @@ node scripts/render-output-pdfs.mjs
 
 ```bash
 cd tools/md-to-pdf-renderer
-npm run render -- --input ../../input --output ../../output
+npm run render -- --input ../../input --output ../../output --paper-size Letter
 ```
 
 ### CLI 옵션
 
 | 옵션 | 설명 | 기본값 |
 | ---- | ---- | ---- |
-| `--input` | 원본 Markdown 디렉터리 | `input` |
+| `--input` | 원본 Markdown 디렉터리 | 현재 실행 디렉터리 |
 | `--output` | PDF 출력 디렉터리 | `output` |
 | `--html` | 중간 HTML 출력 디렉터리 | `<output>/html` |
-| `--chrome-path` | Chrome/Chromium 실행 파일 경로 | `/usr/bin/google-chrome` |
+| `--paper-size` | `A4`, `Letter`, `Legal`, `A3`, `210mm 297mm` 같은 출력 용지 크기 | `A4` |
+| `--chrome-path` | 사용자 지정 Chrome/Chromium 실행 파일 경로, 선택 사항 | Puppeteer 내장 브라우저 |
+
+### npx 배포
+
+다른 사용자가 `npx md-to-pdf-renderer`로 실행할 수 있으려면 이 패키지를 npm에 공개 패키지로 배포해야 합니다.
 
 ### 출력 구조
 
@@ -195,6 +220,7 @@ npm run render -- --input ../../input --output ../../output
 - `<output>/*.pdf`
 - `<html>/*.html`
 - `<output>/README.md`
+- `<output>/render.log`
 
 예시:
 
@@ -217,6 +243,8 @@ output/
 - 최상위 제목이 없으면 파일명을 사람이 읽기 쉬운 제목으로 변환합니다.
 - ```` ```mermaid ```` 코드 펜스는 다이어그램으로 렌더링됩니다.
 - ```` ```text ```` 코드 펜스는 일반 텍스트용 레이아웃으로 렌더링됩니다.
-- 생성되는 PDF는 A4 기준의 print CSS를 사용합니다.
+- 생성되는 PDF는 print CSS를 사용하며 `--paper-size`로 용지 크기를 바꿀 수 있습니다.
+- 변환 진행 상태는 `<output>/render.log`에 기록됩니다.
+- 입력 디렉터리가 없거나 비어 있거나 Markdown 파일이 없으면 명확한 오류로 종료됩니다.
 
 ### 호환성 참고

@@ -3,16 +3,17 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import MarkdownIt from 'markdown-it';
-import puppeteer from 'puppeteer-core';
+import puppeteer from 'puppeteer';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const args = parseArgs(process.argv.slice(2));
 
-const inputDir = path.resolve(process.cwd(), args.input ?? 'input');
+const inputDir = path.resolve(process.cwd(), args.input ?? '.');
 const pdfDir = path.resolve(process.cwd(), args.output ?? 'output');
 const htmlDir = path.resolve(process.cwd(), args.html ?? path.join(pdfDir, 'html'));
-const chromePath = args.chromePath ?? '/usr/bin/google-chrome';
+const renderLogPath = path.join(pdfDir, 'render.log');
+const paperSize = resolvePaperSize(args.paperSize);
 const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 
@@ -55,7 +56,8 @@ md.renderer.rules.fence = (tokens, idx) => {
     `;
 };
 
-const templateCss = `
+function buildTemplateCss() {
+    return `
     :root {
         --ink: #1f2937;
         --muted: #6b7280;
@@ -85,7 +87,7 @@ const templateCss = `
     }
 
     .page-shell {
-        width: 210mm;
+        width: min(${paperSize.pageWidth}, 100%);
         margin: 0 auto;
         padding: 10mm 0 12mm;
     }
@@ -314,7 +316,7 @@ const templateCss = `
     }
 
     @page {
-        size: A4;
+        size: ${paperSize.cssValue};
         margin: 12mm;
     }
 
@@ -337,40 +339,51 @@ const templateCss = `
         }
     }
 `;
+}
 
+await fs.mkdir(pdfDir, { recursive: true });
 await fs.mkdir(htmlDir, { recursive: true });
+await fs.writeFile(renderLogPath, '', 'utf8');
 
-const browser = await puppeteer.launch({
-    executablePath: chromePath,
-    headless: true,
-    args: [
-        '--no-sandbox',
-        '--disable-gpu',
-        '--allow-file-access-from-files',
-    ],
-});
-
-const files = (await fs.readdir(inputDir))
-    .filter((name) => name.endsWith('.md'))
-    .sort((a, b) => a.localeCompare(b, 'ko'));
+await logProgress(
+    `Render started. input=${inputDir} output=${pdfDir} html=${htmlDir} paperSize=${paperSize.displayValue}`,
+);
 
 const manifest = [];
+let browser;
 
 try {
-    for (const fileName of files) {
+    browser = await puppeteer.launch({
+        ...(args.chromePath ? { executablePath: args.chromePath } : {}),
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--allow-file-access-from-files',
+        ],
+    });
+
+    const files = await getMarkdownFiles(inputDir);
+
+    await logProgress(`Discovered ${files.length} markdown file(s).`);
+
+    for (const [index, fileName] of files.entries()) {
         const sourcePath = path.join(inputDir, fileName);
         const markdown = await fs.readFile(sourcePath, 'utf8');
         const title = extractTitle(markdown) ?? toTitle(fileName);
         const html = buildHtml({
             markdown,
             title,
+            paperSize,
         });
         const baseName = fileName.replace(/\.md$/i, '');
         const htmlPath = path.join(htmlDir, `${baseName}.html`);
         const pdfPath = path.join(pdfDir, `${baseName}.pdf`);
 
+        await logProgress(`[${index + 1}/${files.length}] Rendering ${fileName}`);
         await fs.writeFile(htmlPath, html, 'utf8');
         await renderPdf(browser, htmlPath, pdfPath);
+        await logProgress(`[${index + 1}/${files.length}] Completed ${fileName} -> ${baseName}.pdf`);
 
         manifest.push({
             title,
@@ -378,21 +391,28 @@ try {
             pdfName: `${baseName}.pdf`,
         });
     }
+    await logProgress(`Rendered ${manifest.length} PDF file(s).`);
+
+    const manifestMarkdown = [
+        '# PDF 산출물 목록',
+        '',
+        `생성일: ${formatDate(new Date())}`,
+        '',
+        ...manifest.map((item) => `- ${item.title}: \`${item.pdfName}\` (원본: \`${item.fileName}\`)`),
+        '',
+    ].join('\n');
+
+    await fs.writeFile(path.join(pdfDir, 'README.md'), manifestMarkdown, 'utf8');
+    await logProgress(`Wrote manifest: ${path.join(pdfDir, 'README.md')}`);
+    await logProgress('Render finished successfully.');
+} catch (error) {
+    await logProgress(`Render failed: ${formatError(error)}`);
+    throw error;
 } finally {
-    await browser.close();
+    if (browser) {
+        await browser.close();
+    }
 }
-
-const manifestMarkdown = [
-    '# PDF 산출물 목록',
-    '',
-    `생성일: ${formatDate(new Date())}`,
-    '',
-    ...manifest.map((item) => `- ${item.title}: \`${item.pdfName}\` (원본: \`${item.fileName}\`)`),
-    '',
-].join('\n');
-
-await fs.mkdir(pdfDir, { recursive: true });
-await fs.writeFile(path.join(pdfDir, 'README.md'), manifestMarkdown, 'utf8');
 
 function buildHtml({ markdown, title }) {
     const rendered = md.render(markdown);
@@ -403,7 +423,7 @@ function buildHtml({ markdown, title }) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
-    <style>${templateCss}</style>
+    <style>${buildTemplateCss()}</style>
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
 
@@ -592,6 +612,92 @@ function formatDate(date) {
     return `${yyyy}.${mm}.${dd}`;
 }
 
+async function logProgress(message) {
+    const line = `[${new Date().toISOString()}] ${message}\n`;
+    await fs.appendFile(renderLogPath, line, 'utf8');
+    console.log(message);
+}
+
+function formatError(error) {
+    if (error instanceof Error) {
+        return error.stack ?? error.message;
+    }
+
+    return String(error);
+}
+
+function resolvePaperSize(value = 'A4') {
+    const normalized = value.trim().replace(/\s+/g, ' ').toLowerCase();
+    const knownSizes = {
+        a5: { cssValue: 'A5', pageWidth: '148mm', displayValue: 'A5' },
+        a4: { cssValue: 'A4', pageWidth: '210mm', displayValue: 'A4' },
+        'a4 landscape': { cssValue: 'A4 landscape', pageWidth: '297mm', displayValue: 'A4 landscape' },
+        a3: { cssValue: 'A3', pageWidth: '297mm', displayValue: 'A3' },
+        letter: { cssValue: 'Letter', pageWidth: '8.5in', displayValue: 'Letter' },
+        'letter landscape': { cssValue: 'Letter landscape', pageWidth: '11in', displayValue: 'Letter landscape' },
+        legal: { cssValue: 'Legal', pageWidth: '8.5in', displayValue: 'Legal' },
+        'legal landscape': { cssValue: 'Legal landscape', pageWidth: '14in', displayValue: 'Legal landscape' },
+        tabloid: { cssValue: 'Tabloid', pageWidth: '11in', displayValue: 'Tabloid' },
+    };
+
+    if (knownSizes[normalized]) {
+        return knownSizes[normalized];
+    }
+
+    const customSizeMatch = normalized.match(/^([0-9.]+(?:mm|cm|in))\s+([0-9.]+(?:mm|cm|in))$/);
+
+    if (customSizeMatch) {
+        const width = customSizeMatch[1];
+        const height = customSizeMatch[2];
+        return {
+            cssValue: `${width} ${height}`,
+            pageWidth: width,
+            displayValue: `${width} ${height}`,
+        };
+    }
+
+    return {
+        cssValue: value,
+        pageWidth: '210mm',
+        displayValue: value,
+    };
+}
+
+async function getMarkdownFiles(directoryPath) {
+    let stats;
+
+    try {
+        stats = await fs.stat(directoryPath);
+    } catch (error) {
+        if (error?.code === 'ENOENT') {
+            throw new Error(`Input directory does not exist: ${directoryPath}`);
+        }
+
+        throw error;
+    }
+
+    if (!stats.isDirectory()) {
+        throw new Error(`Input path is not a directory: ${directoryPath}`);
+    }
+
+    const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+
+    if (entries.length === 0) {
+        throw new Error(`Input directory is empty: ${directoryPath}`);
+    }
+
+    const markdownFiles = entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b, 'ko'));
+
+    if (markdownFiles.length === 0) {
+        throw new Error(`Input directory does not contain any top-level .md files: ${directoryPath}`);
+    }
+
+    return markdownFiles;
+}
+
 function parseArgs(argv) {
     const parsed = {};
 
@@ -618,6 +724,12 @@ function parseArgs(argv) {
 
         if (arg === '--chrome-path') {
             parsed.chromePath = argv[i + 1];
+            i += 1;
+            continue;
+        }
+
+        if (arg === '--paper-size') {
+            parsed.paperSize = argv[i + 1];
             i += 1;
         }
     }
