@@ -3,6 +3,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import MarkdownIt from 'markdown-it';
+import markdownItFootnote from 'markdown-it-footnote';
+import markdownItTaskLists from 'markdown-it-task-lists';
 import puppeteer from 'puppeteer';
 
 const require = createRequire(import.meta.url);
@@ -29,6 +31,14 @@ const md = new MarkdownIt({
     linkify: true,
     typographer: true,
 });
+
+md.use(markdownItFootnote);
+md.use(markdownItTaskLists, {
+    enabled: true,
+    label: true,
+    labelAfter: true,
+});
+md.use(calloutPlugin);
 
 md.renderer.rules.fence = (tokens, idx) => {
     const token = tokens[idx];
@@ -158,8 +168,36 @@ function buildTemplateCss() {
         padding-left: 6mm;
     }
 
+    ul.contains-task-list {
+        padding-left: 0;
+        list-style: none;
+    }
+
     li + li {
         margin-top: 1.2mm;
+    }
+
+    .task-list-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 2.4mm;
+        list-style: none;
+    }
+
+    .task-list-item + .task-list-item {
+        margin-top: 2mm;
+    }
+
+    .task-list-item-checkbox {
+        flex: none;
+        width: 4mm;
+        height: 4mm;
+        margin: 1.3mm 0 0;
+        accent-color: #0f766e;
+    }
+
+    .task-list-item label {
+        flex: 1;
     }
 
     strong {
@@ -316,10 +354,118 @@ function buildTemplateCss() {
         color: #334155;
     }
 
+    .callout {
+        margin: 5mm 0 7mm;
+        padding: 0;
+        overflow: hidden;
+        border: 0.35mm solid #cbd5e1;
+        border-left-width: 1.4mm;
+        border-radius: 2.6mm;
+        background: #f8fafc;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .callout p {
+        margin: 0;
+        padding: 0 5mm 4mm;
+    }
+
+    .callout p + p,
+    .callout ul,
+    .callout ol {
+        margin-top: 0;
+    }
+
+    .callout-title {
+        padding: 3.2mm 5mm 2.4mm;
+        font-size: 8.8pt;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .callout-note {
+        border-color: #93c5fd;
+        background: #eff6ff;
+    }
+
+    .callout-note .callout-title {
+        color: #1d4ed8;
+    }
+
+    .callout-tip {
+        border-color: #86efac;
+        background: #f0fdf4;
+    }
+
+    .callout-tip .callout-title {
+        color: #15803d;
+    }
+
+    .callout-important {
+        border-color: #c4b5fd;
+        background: #f5f3ff;
+    }
+
+    .callout-important .callout-title {
+        color: #6d28d9;
+    }
+
+    .callout-warning,
+    .callout-caution {
+        border-color: #fdba74;
+        background: #fff7ed;
+    }
+
+    .callout-warning .callout-title,
+    .callout-caution .callout-title {
+        color: #c2410c;
+    }
+
+    img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 5mm auto 7mm;
+        border: 0.35mm solid #d1d5db;
+        border-radius: 2.4mm;
+        background: #ffffff;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
     hr {
         margin: 10mm 0;
         border: 0;
         border-top: 0.5mm solid #d6dde8;
+    }
+
+    sup.footnote-ref {
+        margin-left: 0.8mm;
+        font-size: 0.72em;
+        vertical-align: super;
+    }
+
+    sup.footnote-ref a,
+    .footnote-backref {
+        color: #1d4ed8;
+        text-decoration: none;
+    }
+
+    .footnotes {
+        margin-top: 10mm;
+        padding-top: 5mm;
+        border-top: 0.45mm solid #d1d5db;
+    }
+
+    .footnotes ol {
+        padding-left: 5.5mm;
+    }
+
+    .footnotes li {
+        font-size: 9.4pt;
+        line-height: 1.65;
     }
 
     @page {
@@ -384,6 +530,7 @@ try {
         const html = buildHtml({
             markdown,
             title,
+            baseHref: toDirectoryHref(inputDir),
         });
         const baseName = fileName.replace(/\.md$/i, '');
         const htmlPath = path.join(htmlDir, `${baseName}.html`);
@@ -423,7 +570,7 @@ try {
     }
 }
 
-function buildHtml({ markdown, title }) {
+function buildHtml({ markdown, title, baseHref }) {
     const rendered = md.render(markdown);
 
     return `<!doctype html>
@@ -432,6 +579,7 @@ function buildHtml({ markdown, title }) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
+    <base href="${escapeHtml(baseHref)}" />
     <style>${buildTemplateCss()}</style>
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
@@ -597,6 +745,104 @@ function detectDiagramCaption(content) {
     return 'Diagram Definition';
 }
 
+function calloutPlugin(markdown) {
+    markdown.core.ruler.after('block', 'callout', (state) => {
+        for (let i = 0; i < state.tokens.length; i += 1) {
+            const openToken = state.tokens[i];
+
+            if (openToken.type !== 'blockquote_open') {
+                continue;
+            }
+
+            const paragraphOpen = state.tokens[i + 1];
+            const inlineToken = state.tokens[i + 2];
+            const paragraphClose = state.tokens[i + 3];
+
+            if (
+                paragraphOpen?.type !== 'paragraph_open'
+                || inlineToken?.type !== 'inline'
+                || paragraphClose?.type !== 'paragraph_close'
+            ) {
+                continue;
+            }
+
+            const lines = inlineToken.content.split('\n');
+            const markerMatch = lines[0]?.match(/^\[!([A-Z]+)\]\s*(.*)$/);
+
+            if (!markerMatch) {
+                continue;
+            }
+
+            const callout = resolveCallout(markerMatch[1]);
+
+            if (!callout) {
+                continue;
+            }
+
+            const closeIndex = findMatchingBlockquoteClose(state.tokens, i);
+
+            if (closeIndex === -1) {
+                continue;
+            }
+
+            openToken.tag = 'aside';
+            openToken.attrJoin('class', `callout callout-${callout.name}`);
+            state.tokens[closeIndex].tag = 'aside';
+
+            const titleBlock = new state.Token('html_block', '', 0);
+            titleBlock.content = `<p class="callout-title">${escapeHtml(callout.title)}</p>\n`;
+
+            state.tokens.splice(i + 1, 0, titleBlock);
+
+            const bodyLines = [markerMatch[2], ...lines.slice(1)];
+            const bodyContent = bodyLines.join('\n').trim();
+
+            if (bodyContent) {
+                inlineToken.content = bodyContent;
+                inlineToken.children = [];
+                i += 1;
+                continue;
+            }
+
+            state.tokens.splice(i + 2, 3);
+            i += 1;
+        }
+    });
+}
+
+function resolveCallout(value) {
+    const normalized = value.trim().toLowerCase();
+    const callouts = {
+        note: { name: 'note', title: 'Note' },
+        tip: { name: 'tip', title: 'Tip' },
+        important: { name: 'important', title: 'Important' },
+        warning: { name: 'warning', title: 'Warning' },
+        caution: { name: 'caution', title: 'Caution' },
+    };
+
+    return callouts[normalized] ?? null;
+}
+
+function findMatchingBlockquoteClose(tokens, startIndex) {
+    let depth = 0;
+
+    for (let i = startIndex; i < tokens.length; i += 1) {
+        if (tokens[i].type === 'blockquote_open') {
+            depth += 1;
+        }
+
+        if (tokens[i].type === 'blockquote_close') {
+            depth -= 1;
+
+            if (depth === 0) {
+                return i;
+            }
+        }
+    }
+
+    return -1;
+}
+
 function toTitle(fileName) {
     return fileName
         .replace(/\.md$/i, '')
@@ -619,6 +865,11 @@ function formatDate(date) {
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}.${mm}.${dd}`;
+}
+
+function toDirectoryHref(directoryPath) {
+    const href = pathToFileURL(directoryPath).href;
+    return href.endsWith('/') ? href : `${href}/`;
 }
 
 async function logProgress(message) {
