@@ -1,12 +1,27 @@
 {
     "name": "md-to-pdf-renderer",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "type": "module",
-    "description": "Markdown to PDF renderer with Mermaid support",
+    "description": "CLI to render Markdown files to print-ready HTML and PDF with Mermaid, KaTeX, TOC, footnotes, and GitHub-style callouts",
+    "homepage": "https://github.com/hahabsw/md-to-pdf-renderer#readme",
+    "bugs": {
+        "url": "https://github.com/hahabsw/md-to-pdf-renderer/issues"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/hahabsw/md-to-pdf-renderer.git"
     },
+    "keywords": [
+        "markdown",
+        "pdf",
+        "renderer",
+        "cli",
+        "markdown-to-pdf",
+        "documentation",
+        "mermaid",
+        "katex",
+        "puppeteer"
+    ],
     "bin": {
         "md-to-pdf-renderer": "./bin/md-to-pdf-renderer.mjs"
     },
