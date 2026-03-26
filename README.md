@@ -151,6 +151,48 @@ Available exports:
 - `main(argv, runtime)` runs the CLI programmatically.
 - `parseArgs(argv)` and `getHelpText()` are exposed for custom wrappers.
 
+`renderMarkdownDirectory(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
+| `inputDir` / `input` | `string` | `.` | Directory containing top-level `*.md` files |
+| `outputDir` / `output` | `string` | `output` | Directory where PDFs and manifest are written |
+| `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML files are also written |
+| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
+| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
+| `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
+| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+| `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
+
+`renderMarkdownDirectory(options)` return value:
+
+| Field | Type | Description |
+| ---- | ---- | ---- |
+| `inputDir` | `string` | Absolute input directory path |
+| `outputDir` | `string` | Absolute output directory path |
+| `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
+| `manifestPath` | `string` | Absolute path to generated manifest |
+| `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
+| `files` | `Array<{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }>` | Per-file output metadata |
+
+`renderMarkdownToHtml(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `markdown` | `string` | Required | Markdown source to render |
+| `title` | `string` | First `# Heading` or `Document` | HTML document title |
+| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
+| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
+| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
+| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
+| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
+
+`main(argv, runtime)`:
+
+- Returns `0` on success and `1` on failure.
+- Accepts injectable `stdout`, `stderr`, and `cwd` so wrapper CLIs can capture output without spawning a child process.
+
 ### CLI options
 
 | Option | Description | Default |

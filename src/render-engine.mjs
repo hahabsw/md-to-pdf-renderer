@@ -13,6 +13,49 @@ import {
     toDirectoryHref,
 } from './render-options.mjs';
 
+/**
+ * @typedef {Object} RenderedFile
+ * @property {string} title Human-readable document title used in the manifest.
+ * @property {string} fileName Source Markdown file name.
+ * @property {string} pdfName Output PDF file name.
+ * @property {string} pdfPath Absolute path to the generated PDF file.
+ * @property {string | null} htmlPath Absolute path to the generated HTML file when `htmlDir` is enabled.
+ * @property {string} sourcePath Absolute path to the source Markdown file.
+ */
+
+/**
+ * @typedef {Object} RenderDirectoryResult
+ * @property {string} inputDir Absolute input directory path.
+ * @property {string} outputDir Absolute output directory path.
+ * @property {string | null} htmlDir Absolute HTML output directory path when enabled.
+ * @property {string} manifestPath Absolute path to the generated output manifest.
+ * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
+ * @property {RenderedFile[]} files Rendered output metadata for each Markdown file.
+ */
+
+/**
+ * Render every top-level Markdown file in a directory into PDF files.
+ *
+ * Paths may be absolute or relative to `cwd`. By default the renderer writes
+ * PDFs and a manifest into `output`, skips intermediate HTML files, and logs
+ * progress through `onProgress` only.
+ *
+ * @param {Object} [options={}]
+ * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
+ * @param {string} [options.inputDir]
+ * @param {string} [options.input] Alias for `inputDir`.
+ * @param {string} [options.outputDir]
+ * @param {string} [options.output] Alias for `outputDir`.
+ * @param {string | null} [options.htmlDir]
+ * @param {string | null} [options.html] Alias for `htmlDir`.
+ * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
+ * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @param {boolean} [options.logToFile=false]
+ * @param {boolean} [options.logFile=false] Alias for `logToFile`.
+ * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
+ * @param {(message: string) => (void | Promise<void>)} [options.onProgress] Callback invoked for each progress message.
+ * @returns {Promise<RenderDirectoryResult>}
+ */
 export async function renderMarkdownDirectory(options = {}) {
     const renderOptions = resolveRenderOptions(options);
     const logProgress = createLogger(renderOptions);
@@ -114,6 +157,22 @@ export async function renderMarkdownDirectory(options = {}) {
     }
 }
 
+/**
+ * Render a single Markdown string into the HTML document used by the PDF pipeline.
+ *
+ * This function does not write files and does not launch a browser.
+ *
+ * @param {Object} options
+ * @param {string} options.markdown Markdown source to render.
+ * @param {string} [options.title] Optional HTML document title. Defaults to the first `# Heading` or `Document`.
+ * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
+ * @param {string} [options.baseDir='.'] Base directory used for relative asset links when `baseHref` is omitted.
+ * @param {string} [options.inputDir] Alias for `baseDir`.
+ * @param {string} [options.baseHref] Explicit `<base href>` value for generated HTML.
+ * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
+ * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @returns {Promise<string>}
+ */
 export async function renderMarkdownToHtml(options) {
     const renderOptions = resolveDocumentRenderOptions(options);
 
@@ -125,6 +184,12 @@ export async function renderMarkdownToHtml(options) {
     });
 }
 
+/**
+ * Convert unknown thrown values into a printable error string.
+ *
+ * @param {unknown} error
+ * @returns {string}
+ */
 export function formatError(error) {
     if (error instanceof Error) {
         return error.message;

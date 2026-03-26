@@ -1,5 +1,10 @@
 import { formatError, renderMarkdownDirectory } from './render-engine.mjs';
 
+/**
+ * Return the CLI help text used by `--help`.
+ *
+ * @returns {string}
+ */
 export function getHelpText() {
     return `
 md-to-pdf-renderer
@@ -27,6 +32,23 @@ Examples:
 `.trimStart();
 }
 
+/**
+ * Parse CLI flags into an option object suitable for `main()`.
+ *
+ * Unknown flags are ignored for now so wrappers can pre-process arguments.
+ *
+ * @param {string[]} argv
+ * @returns {{
+ *   help?: boolean,
+ *   input?: string,
+ *   output?: string,
+ *   html?: string,
+ *   chromePath?: string,
+ *   paperSize?: string,
+ *   orientation?: string,
+ *   logFile?: boolean,
+ * }}
+ */
 export function parseArgs(argv) {
     const parsed = {};
 
@@ -82,6 +104,19 @@ export function parseArgs(argv) {
     return parsed;
 }
 
+/**
+ * Run the CLI programmatically.
+ *
+ * This is useful for embedding the CLI behavior inside another Node.js process
+ * while providing custom stdio streams.
+ *
+ * @param {string[]} [argv=process.argv.slice(2)] CLI-style argument list.
+ * @param {Object} [runtime={}]
+ * @param {string} [runtime.cwd=process.cwd()] Working directory used to resolve relative paths.
+ * @param {{ write(chunk: string): unknown }} [runtime.stdout=process.stdout] Stream-like target for progress output.
+ * @param {{ write(chunk: string): unknown }} [runtime.stderr=process.stderr] Stream-like target for error output.
+ * @returns {Promise<0 | 1>}
+ */
 export async function main(argv = process.argv.slice(2), runtime = {}) {
     const args = parseArgs(argv);
     const stdout = runtime.stdout ?? process.stdout;

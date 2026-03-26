@@ -6,7 +6,10 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+    formatError,
     getHelpText,
+    main,
+    parseArgs,
     renderMarkdownDirectory,
     renderMarkdownToHtml,
 } from '../src/render-pdfs.mjs';
@@ -56,6 +59,33 @@ test('exports help text for library consumers', () => {
 
     assert.match(helpText, /md-to-pdf-renderer/);
     assert.match(helpText, /optional HTML output/);
+});
+
+test('parses CLI arguments for programmatic consumers', () => {
+    const args = parseArgs([
+        '--input', 'docs',
+        '--output', 'out',
+        '--html', 'out/html',
+        '--paper-size', 'Letter',
+        '--orientation', 'landscape',
+        '--chrome-path', '/usr/bin/chromium',
+        '--log-file',
+    ]);
+
+    assert.deepEqual(args, {
+        input: 'docs',
+        output: 'out',
+        html: 'out/html',
+        paperSize: 'Letter',
+        orientation: 'landscape',
+        chromePath: '/usr/bin/chromium',
+        logFile: true,
+    });
+});
+
+test('formats Error and non-Error values consistently', () => {
+    assert.equal(formatError(new Error('boom')), 'boom');
+    assert.equal(formatError('plain failure'), 'plain failure');
 });
 
 test('renders PDFs without creating HTML files by default', { timeout: 120_000 }, async () => {
@@ -146,6 +176,23 @@ test('renders HTML through the library API without side effects', async () => {
     assert.match(html, /katex/i);
 });
 
+test('renders HTML through the library API with computed defaults', async () => {
+    const html = await renderMarkdownToHtml({
+        markdown: '# Derived Title\n\n## Section',
+        baseDir: fixtureInputDir,
+    });
+
+    assert.match(html, /<title>Derived Title<\/title>/);
+    assert.match(html, /<h2 id="section">Section<\/h2>/);
+});
+
+test('rejects invalid programmatic HTML render input', async () => {
+    await assert.rejects(
+        renderMarkdownToHtml({ title: 'Missing Markdown' }),
+        /renderMarkdownToHtml requires a markdown string\./,
+    );
+});
+
 test('renders PDFs through the library API and returns output metadata', { timeout: 120_000 }, async () => {
     const tempDir = await createTempDir();
     const outputDir = path.join(tempDir, 'output');
@@ -181,6 +228,59 @@ test('renders PDFs through the library API and returns output metadata', { timeo
         assert.match(manifest, /rendering-showcase\.pdf/);
         assert.match(log, /Render finished successfully\./);
         assert.ok(messages.some((message) => message.includes('Rendering rendering-showcase.md')));
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('runs the CLI entrypoint through main() with injected streams', async () => {
+    const stdout = [];
+    const stderr = [];
+    const tempDir = await createTempDir();
+    const outputDir = path.join(tempDir, 'output');
+
+    try {
+        const exitCode = await main(
+            ['--input', fixtureInputDir, '--output', outputDir],
+            {
+                cwd: repoRoot,
+                stdout: { write: (chunk) => stdout.push(String(chunk)) },
+                stderr: { write: (chunk) => stderr.push(String(chunk)) },
+            },
+        );
+
+        assert.equal(exitCode, 0);
+        assert.equal(stderr.length, 0);
+        assert.ok(stdout.some((chunk) => chunk.includes('Render started.')));
+        assert.ok(stdout.some((chunk) => chunk.includes('Render finished successfully.')));
+
+        const pdfStat = await fs.stat(path.join(outputDir, 'rendering-showcase.pdf'));
+        assert.ok(pdfStat.size > 0);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('returns a non-zero exit code from main() on failure', async () => {
+    const stdout = [];
+    const stderr = [];
+    const tempDir = await createTempDir();
+    const missingInputDir = path.join(tempDir, 'missing');
+
+    try {
+        const exitCode = await main(
+            ['--input', missingInputDir, '--output', path.join(tempDir, 'output')],
+            {
+                cwd: repoRoot,
+                stdout: { write: (chunk) => stdout.push(String(chunk)) },
+                stderr: { write: (chunk) => stderr.push(String(chunk)) },
+            },
+        );
+
+        assert.equal(exitCode, 1);
+        assert.ok(stdout.some((chunk) => chunk.includes('Render started.')));
+        assert.ok(stdout.some((chunk) => chunk.includes('Render failed:')));
+        assert.ok(stderr.some((chunk) => chunk.includes('Input directory does not exist:')));
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
