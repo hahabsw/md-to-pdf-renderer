@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import MarkdownIt from 'markdown-it';
 import markdownItFootnote from 'markdown-it-footnote';
-import markdownItKatex from 'markdown-it-katex';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import puppeteer from 'puppeteer';
 
@@ -24,7 +23,9 @@ const renderLogPath = path.join(pdfDir, 'render.log');
 const logToFile = Boolean(args.logFile);
 const paperOrientation = resolvePaperOrientation(args.orientation);
 const paperLayout = resolvePaperLayout(args.paperSize, paperOrientation);
-const katexCssHref = pathToFileURL(require.resolve('katex/dist/katex.min.css')).href;
+const katexCssPath = require.resolve('katex/dist/katex.min.css');
+const katexCss = await loadKatexCss();
+const katex = require('katex');
 const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 
@@ -35,7 +36,9 @@ const md = new MarkdownIt({
 });
 
 md.use(markdownItFootnote);
-md.use(markdownItKatex);
+md.use(katexPlugin, {
+    throwOnError: false,
+});
 md.use(markdownItTaskLists, {
     enabled: true,
     label: true,
@@ -493,6 +496,28 @@ function buildTemplateCss() {
         font-size: 1.02em;
     }
 
+    .katex,
+    .katex *,
+    .katex-display,
+    .katex-display * {
+        box-sizing: content-box;
+        word-break: normal;
+        overflow-wrap: normal;
+        word-wrap: normal;
+        letter-spacing: normal;
+    }
+
+    .katex .base,
+    .katex .strut,
+    .katex .vlist,
+    .katex .vlist *,
+    .katex .mord,
+    .katex .mfrac,
+    .katex-display > .katex,
+    .katex-display > .katex > .katex-html {
+        white-space: nowrap;
+    }
+
     img {
         display: block;
         max-width: 100%;
@@ -650,7 +675,7 @@ function buildHtml({ markdown, title, baseHref }) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
     <base href="${escapeHtml(baseHref)}" />
-    <link rel="stylesheet" href="${escapeHtml(katexCssHref)}" />
+    <style>${katexCss}</style>
     <style>${buildTemplateCss()}</style>
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
@@ -788,6 +813,11 @@ async function renderPdf(browser, htmlPath, pdfPath) {
                 timeout: 30_000,
             },
         );
+        await page.evaluate(async () => {
+            if (document.fonts?.ready) {
+                await document.fonts.ready;
+            }
+        });
         await page.pdf({
             path: pdfPath,
             printBackground: true,
@@ -814,6 +844,172 @@ function detectDiagramCaption(content) {
     }
 
     return 'Diagram Definition';
+}
+
+function katexPlugin(markdown, options = {}) {
+    markdown.inline.ruler.after('escape', 'math_inline', (state, silent) => {
+        if (state.src[state.pos] !== '$') {
+            return false;
+        }
+
+        const opening = isValidMathDelimiter(state, state.pos);
+
+        if (!opening.canOpen) {
+            if (!silent) {
+                state.pending += '$';
+            }
+            state.pos += 1;
+            return true;
+        }
+
+        const start = state.pos + 1;
+        let match = start;
+
+        while ((match = state.src.indexOf('$', match)) !== -1) {
+            let pos = match - 1;
+
+            while (state.src[pos] === '\\') {
+                pos -= 1;
+            }
+
+            if ((match - pos) % 2 === 1) {
+                break;
+            }
+
+            match += 1;
+        }
+
+        if (match === -1) {
+            if (!silent) {
+                state.pending += '$';
+            }
+            state.pos = start;
+            return true;
+        }
+
+        if (match - start === 0) {
+            if (!silent) {
+                state.pending += '$$';
+            }
+            state.pos = start + 1;
+            return true;
+        }
+
+        const closing = isValidMathDelimiter(state, match);
+
+        if (!closing.canClose) {
+            if (!silent) {
+                state.pending += '$';
+            }
+            state.pos = start;
+            return true;
+        }
+
+        if (!silent) {
+            const token = state.push('math_inline', 'math', 0);
+            token.markup = '$';
+            token.content = state.src.slice(start, match);
+        }
+
+        state.pos = match + 1;
+        return true;
+    });
+
+    markdown.block.ruler.after('blockquote', 'math_block', (state, start, end, silent) => {
+        let pos = state.bMarks[start] + state.tShift[start];
+        const max = state.eMarks[start];
+
+        if (pos + 2 > max || state.src.slice(pos, pos + 2) !== '$$') {
+            return false;
+        }
+
+        pos += 2;
+        let firstLine = state.src.slice(pos, max);
+
+        if (silent) {
+            return true;
+        }
+
+        let found = false;
+        let lastLine = '';
+        let next = start;
+
+        if (firstLine.trim().endsWith('$$')) {
+            firstLine = firstLine.trim().slice(0, -2);
+            found = true;
+        }
+
+        while (!found) {
+            next += 1;
+
+            if (next >= end) {
+                break;
+            }
+
+            pos = state.bMarks[next] + state.tShift[next];
+            const lineMax = state.eMarks[next];
+
+            if (pos < lineMax && state.tShift[next] < state.blkIndent) {
+                break;
+            }
+
+            if (state.src.slice(pos, lineMax).trim().endsWith('$$')) {
+                const lastPos = state.src.slice(0, lineMax).lastIndexOf('$$');
+                lastLine = state.src.slice(pos, lastPos);
+                found = true;
+            }
+        }
+
+        state.line = next + 1;
+
+        const token = state.push('math_block', 'math', 0);
+        token.block = true;
+        token.content = `${firstLine && firstLine.trim() ? `${firstLine}\n` : ''}${state.getLines(start + 1, next, state.tShift[start], true)}${lastLine && lastLine.trim() ? lastLine : ''}`;
+        token.map = [start, state.line];
+        token.markup = '$$';
+        return true;
+    }, {
+        alt: ['paragraph', 'reference', 'blockquote', 'list'],
+    });
+
+    markdown.renderer.rules.math_inline = (tokens, idx) => renderKatex(tokens[idx].content, false, options);
+    markdown.renderer.rules.math_block = (tokens, idx) => `<p>${renderKatex(tokens[idx].content, true, options)}</p>\n`;
+}
+
+function renderKatex(latex, displayMode, options) {
+    try {
+        return katex.renderToString(latex, {
+            ...options,
+            displayMode,
+        });
+    } catch (error) {
+        if (options.throwOnError) {
+            throw error;
+        }
+
+        return escapeHtml(latex);
+    }
+}
+
+function isValidMathDelimiter(state, pos) {
+    const prevChar = pos > 0 ? state.src.charCodeAt(pos - 1) : -1;
+    const nextChar = pos + 1 <= state.posMax ? state.src.charCodeAt(pos + 1) : -1;
+
+    let canOpen = true;
+    let canClose = true;
+
+    if (prevChar === 0x20 || prevChar === 0x09 || (nextChar >= 0x30 && nextChar <= 0x39)) {
+        canClose = false;
+    }
+
+    if (nextChar === 0x20 || nextChar === 0x09) {
+        canOpen = false;
+    }
+
+    return {
+        canOpen,
+        canClose,
+    };
 }
 
 function calloutPlugin(markdown) {
@@ -1039,6 +1235,17 @@ function uniqueSlug(baseSlug, slugCounts) {
     }
 
     return `${baseSlug}-${count + 1}`;
+}
+
+async function loadKatexCss() {
+    const css = await fs.readFile(katexCssPath, 'utf8');
+    const katexDistDir = path.dirname(katexCssPath);
+
+    return css.replace(/url\((fonts\/[^)]+)\)/g, (_match, relativePath) => {
+        const cleanedPath = relativePath.replace(/^['"]|['"]$/g, '');
+        const absoluteHref = pathToFileURL(path.join(katexDistDir, cleanedPath)).href;
+        return `url("${absoluteHref}")`;
+    });
 }
 
 function toTitle(fileName) {
