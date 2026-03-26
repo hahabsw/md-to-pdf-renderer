@@ -34,6 +34,7 @@ Tool contract:
 - Output is `*.pdf`, `html/*.html`, and a manifest `README.md` in `--output`.
 - For automation, prefer passing both `--input` and `--output` explicitly instead of relying on defaults.
 - The command exits with a non-zero status when the input directory is missing, empty, or when Mermaid rendering fails.
+- On Linux ARM boards, prefer a system Chromium or Chrome path via `--chrome-path` or `PUPPETEER_EXECUTABLE_PATH`.
 
 ### Preview
 
@@ -66,6 +67,7 @@ When you run the renderer:
 - `npm install` for this tool directory
 - No separate Chrome installation is required by default
 - Network access for Mermaid ESM loading from jsDelivr at render time
+- Linux ARM boards may need a system Chromium or Chrome executable instead of Puppeteer's bundled browser
 
 ### Dependencies
 
@@ -102,6 +104,12 @@ npx md-to-pdf-renderer --help
 npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientation portrait --log-file
 ```
 
+Linux ARM example:
+
+```bash
+npx md-to-pdf-renderer --input input --output output --chrome-path /usr/bin/chromium
+```
+
 Run from the repository root:
 
 ```bash
@@ -118,7 +126,7 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 | `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
 | `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |
 | `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
-| `--chrome-path` | Optional path to a custom Chrome/Chromium executable | Bundled Puppeteer browser |
+| `--chrome-path` | Optional path to a custom Chrome or Chromium executable | Bundled Puppeteer browser |
 
 ### Output structure
 
@@ -160,5 +168,6 @@ output/
 - `<output>/render.log` is only written when `--log-file` is enabled.
 - Mermaid rendering errors fail the command instead of silently producing a broken diagram in the PDF.
 - Missing, empty, or invalid input directories fail with a clear error message.
+- On Linux ARM, the bundled Puppeteer browser may be unusable, so pass `--chrome-path` or set `PUPPETEER_EXECUTABLE_PATH`.
 
 ### Compatibility note

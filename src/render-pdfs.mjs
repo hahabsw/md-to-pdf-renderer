@@ -615,14 +615,11 @@ const manifest = [];
 let browser;
 
 try {
+    const launchOptions = await resolveBrowserLaunchOptions(args.chromePath);
+
     browser = await puppeteer.launch({
-        ...(args.chromePath ? { executablePath: args.chromePath } : {}),
+        ...launchOptions,
         headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-gpu',
-            '--allow-file-access-from-files',
-        ],
     });
 
     const files = await getMarkdownFiles(inputDir);
@@ -1323,6 +1320,87 @@ function handleFatalError(error) {
     process.exitCode = 1;
 }
 
+async function resolveBrowserLaunchOptions(cliChromePath) {
+    const executablePath = cliChromePath
+        || process.env.PUPPETEER_EXECUTABLE_PATH
+        || process.env.CHROME_PATH;
+
+    if (executablePath) {
+        return buildBrowserLaunchOptions(executablePath);
+    }
+
+    const systemBrowser = await findSystemBrowser();
+
+    if (systemBrowser) {
+        return buildBrowserLaunchOptions(systemBrowser);
+    }
+
+    if (process.platform === 'linux' && (process.arch === 'arm64' || process.arch === 'arm')) {
+        throw new Error(
+            'Linux ARM does not reliably support Puppeteer\'s bundled Chrome in this tool. '
+            + 'Install Chromium or Chrome on the board and run again with --chrome-path <path> '
+            + 'or set PUPPETEER_EXECUTABLE_PATH.',
+        );
+    }
+
+    return {};
+}
+
+function buildBrowserLaunchOptions(executablePath) {
+    const browser = detectBrowserType(executablePath);
+
+    if (browser === 'firefox') {
+        throw new Error(
+            'Firefox is not supported by this renderer. '
+            + 'Use a Chrome or Chromium executable with --chrome-path '
+            + 'or set PUPPETEER_EXECUTABLE_PATH to a Chrome/Chromium binary.',
+        );
+    }
+
+    return {
+        browser,
+        executablePath,
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--allow-file-access-from-files',
+        ],
+    };
+}
+
+function detectBrowserType(executablePath) {
+    const lower = executablePath.toLowerCase();
+
+    if (lower.includes('firefox')) {
+        return 'firefox';
+    }
+
+    return 'chrome';
+}
+
+async function findSystemBrowser() {
+    const candidates = [
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/snap/bin/chromium',
+        '/usr/lib/chromium-browser/chromium-browser',
+        '/usr/lib/chromium/chromium',
+    ];
+
+    for (const candidate of candidates) {
+        try {
+            await fs.access(candidate);
+            return candidate;
+        } catch {
+            // Keep scanning known browser paths.
+        }
+    }
+
+    return null;
+}
+
 function printHelp() {
     const helpText = `
 md-to-pdf-renderer
@@ -1339,12 +1417,13 @@ Options:
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
   --log-file             Write progress logs to <output>/render.log
-  --chrome-path <path>   Use a custom Chrome/Chromium executable instead of Puppeteer's bundled browser
+  --chrome-path <path>   Use a custom Chrome or Chromium executable instead of Puppeteer's bundled browser
   --help, -h             Show this help message
 
 Examples:
   md-to-pdf-renderer --output output
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
+  md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
 `;
 
     process.stdout.write(helpText.trimStart());
