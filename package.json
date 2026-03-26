@@ -2,7 +2,8 @@
     "name": "md-to-pdf-renderer",
     "version": "0.1.6",
     "type": "module",
-    "description": "CLI to render Markdown files to print-ready HTML and PDF with Mermaid, KaTeX, TOC, footnotes, and GitHub-style callouts",
+    "license": "MIT",
+    "description": "CLI to render Markdown files to print-ready PDF with optional HTML output, Mermaid, KaTeX, TOC, footnotes, and GitHub-style callouts",
     "homepage": "https://github.com/hahabsw/md-to-pdf-renderer#readme",
     "bugs": {
         "url": "https://github.com/hahabsw/md-to-pdf-renderer/issues"
@@ -28,6 +29,7 @@
     "files": [
         "bin",
         "src",
+        "LICENSE",
         "README.md"
     ],
     "publishConfig": {

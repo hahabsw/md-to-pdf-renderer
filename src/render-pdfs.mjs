@@ -23,7 +23,7 @@ if (args.help) {
 
 const inputDir = path.resolve(process.cwd(), args.input ?? '.');
 const pdfDir = path.resolve(process.cwd(), args.output ?? 'output');
-const htmlDir = path.resolve(process.cwd(), args.html ?? path.join(pdfDir, 'html'));
+const htmlDir = args.html ? path.resolve(process.cwd(), args.html) : null;
 const renderLogPath = path.join(pdfDir, 'render.log');
 const logToFile = Boolean(args.logFile);
 const paperOrientation = resolvePaperOrientation(args.orientation);
@@ -595,7 +595,10 @@ function buildTemplateCss() {
 }
 
 await fs.mkdir(pdfDir, { recursive: true });
-await fs.mkdir(htmlDir, { recursive: true });
+
+if (htmlDir) {
+    await fs.mkdir(htmlDir, { recursive: true });
+}
 
 if (logToFile) {
     await fs.writeFile(renderLogPath, '', 'utf8');
@@ -605,7 +608,7 @@ await logProgress(
     `Render started.
     input=${inputDir}
     output=${pdfDir}
-    html=${htmlDir}
+    html=${htmlDir ?? 'disabled'}
     paperSize=${paperLayout.sizeDisplayValue}
     orientation=${paperOrientation.displayValue}
     logFile=${logToFile ? renderLogPath : 'disabled'}`,
@@ -636,12 +639,18 @@ try {
             baseHref: toDirectoryHref(inputDir),
         });
         const baseName = fileName.replace(/\.md$/i, '');
-        const htmlPath = path.join(htmlDir, `${baseName}.html`);
         const pdfPath = path.join(pdfDir, `${baseName}.pdf`);
+        const htmlPath = htmlDir ? path.join(htmlDir, `${baseName}.html`) : null;
 
         await logProgress(`[${index + 1}/${files.length}] Rendering ${fileName}`);
-        await fs.writeFile(htmlPath, html, 'utf8');
-        await renderPdf(browser, htmlPath, pdfPath);
+        if (htmlPath) {
+            await fs.writeFile(htmlPath, html, 'utf8');
+        }
+        await renderPdf(browser, {
+            html,
+            pdfPath,
+            documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
+        });
         await logProgress(`[${index + 1}/${files.length}] Completed ${fileName} -> ${baseName}.pdf`);
 
         manifest.push({
@@ -808,11 +817,11 @@ function buildHtml({ markdown, title, baseHref }) {
 </html>`;
 }
 
-async function renderPdf(browser, htmlPath, pdfPath) {
+async function renderPdf(browser, { html, pdfPath, documentLabel }) {
     const page = await browser.newPage();
 
     try {
-        await page.goto(pathToFileURL(htmlPath).href, {
+        await page.setContent(html, {
             waitUntil: 'networkidle0',
         });
         await page.emulateMediaType('print');
@@ -825,7 +834,7 @@ async function renderPdf(browser, htmlPath, pdfPath) {
         const mermaidError = await page.evaluate(() => document.body.dataset.mermaidError || null);
 
         if (mermaidError) {
-            throw new Error(`Mermaid render failed for ${path.basename(htmlPath)}: ${mermaidError}`);
+            throw new Error(`Mermaid render failed for ${documentLabel}: ${mermaidError}`);
         }
         await page.evaluate(async () => {
             if (document.fonts?.ready) {
@@ -1405,7 +1414,7 @@ function printHelp() {
     const helpText = `
 md-to-pdf-renderer
 
-Convert top-level Markdown files in a directory into styled HTML and PDF files.
+Convert top-level Markdown files in a directory into styled PDF files, with optional HTML output.
 
 Usage:
   md-to-pdf-renderer [options]
@@ -1413,7 +1422,7 @@ Usage:
 Options:
   --input <dir>          Source Markdown directory. Default: current working directory
   --output <dir>         PDF output directory. Default: output
-  --html <dir>           Intermediate HTML output directory. Default: <output>/html
+  --html <dir>           Also write intermediate HTML files to this directory. Default: disabled
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
   --log-file             Write progress logs to <output>/render.log
@@ -1422,6 +1431,7 @@ Options:
 
 Examples:
   md-to-pdf-renderer --output output
+  md-to-pdf-renderer --input docs --output pdf --html pdf/html
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
 `;
