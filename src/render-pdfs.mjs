@@ -9,6 +9,11 @@ import puppeteer from 'puppeteer';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+let fatalErrorReported = false;
+
+process.on('uncaughtException', handleFatalError);
+process.on('unhandledRejection', handleFatalError);
+
 const args = parseArgs(process.argv.slice(2));
 
 if (args.help) {
@@ -597,7 +602,13 @@ if (logToFile) {
 }
 
 await logProgress(
-    `Render started. input=${inputDir} output=${pdfDir} html=${htmlDir} paperSize=${paperLayout.sizeDisplayValue} orientation=${paperOrientation.displayValue} logFile=${logToFile ? renderLogPath : 'disabled'}`,
+    `Render started.
+    input=${inputDir}
+    output=${pdfDir}
+    html=${htmlDir}
+    paperSize=${paperLayout.sizeDisplayValue}
+    orientation=${paperOrientation.displayValue}
+    logFile=${logToFile ? renderLogPath : 'disabled'}`,
 );
 
 const manifest = [];
@@ -658,7 +669,8 @@ try {
     await logProgress('Render finished successfully.');
 } catch (error) {
     await logProgress(`Render failed: ${formatError(error)}`);
-    throw error;
+    fatalErrorReported = true;
+    process.exitCode = 1;
 } finally {
     if (browser) {
         await browser.close();
@@ -1294,10 +1306,21 @@ async function logProgress(message) {
 
 function formatError(error) {
     if (error instanceof Error) {
-        return error.stack ?? error.message;
+        return error.message;
     }
 
     return String(error);
+}
+
+function handleFatalError(error) {
+    if (fatalErrorReported) {
+        process.exitCode = 1;
+        return;
+    }
+
+    fatalErrorReported = true;
+    console.error(formatError(error));
+    process.exitCode = 1;
 }
 
 function printHelp() {
