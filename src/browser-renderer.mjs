@@ -1,0 +1,118 @@
+import fs from 'node:fs/promises';
+
+export async function renderPdf(browser, { html, pdfPath, documentLabel }) {
+    const page = await browser.newPage();
+
+    try {
+        await page.setContent(html, {
+            waitUntil: 'networkidle0',
+        });
+        await page.emulateMediaType('print');
+        await page.waitForFunction(
+            () => document.body.dataset.mermaidReady === 'true' || Boolean(document.body.dataset.mermaidError),
+            {
+                timeout: 30_000,
+            },
+        );
+        const mermaidError = await page.evaluate(() => document.body.dataset.mermaidError || null);
+
+        if (mermaidError) {
+            throw new Error(`Mermaid render failed for ${documentLabel}: ${mermaidError}`);
+        }
+
+        await page.evaluate(async () => {
+            if (document.fonts?.ready) {
+                await document.fonts.ready;
+            }
+        });
+        await page.pdf({
+            path: pdfPath,
+            printBackground: true,
+            displayHeaderFooter: false,
+            preferCSSPageSize: true,
+        });
+    } finally {
+        await page.close();
+    }
+}
+
+export async function resolveBrowserLaunchOptions(cliChromePath) {
+    const executablePath = cliChromePath
+        || process.env.PUPPETEER_EXECUTABLE_PATH
+        || process.env.CHROME_PATH;
+
+    if (executablePath) {
+        return buildBrowserLaunchOptions(executablePath);
+    }
+
+    const systemBrowser = await findSystemBrowser();
+
+    if (systemBrowser) {
+        return buildBrowserLaunchOptions(systemBrowser);
+    }
+
+    if (process.platform === 'linux' && (process.arch === 'arm64' || process.arch === 'arm')) {
+        throw new Error(
+            'Linux ARM does not reliably support Puppeteer\'s bundled Chrome in this tool. '
+            + 'Install Chromium or Chrome on the board and run again with --chrome-path <path> '
+            + 'or set PUPPETEER_EXECUTABLE_PATH.',
+        );
+    }
+
+    return {};
+}
+
+function buildBrowserLaunchOptions(executablePath) {
+    const browser = detectBrowserType(executablePath);
+
+    if (browser === 'firefox') {
+        throw new Error(
+            'Firefox is not supported by this renderer. '
+            + 'Use a Chrome or Chromium executable with --chrome-path '
+            + 'or set PUPPETEER_EXECUTABLE_PATH to a Chrome/Chromium binary.',
+        );
+    }
+
+    return {
+        browser,
+        executablePath,
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+            '--allow-file-access-from-files',
+        ],
+    };
+}
+
+function detectBrowserType(executablePath) {
+    const lower = executablePath.toLowerCase();
+
+    if (lower.includes('firefox')) {
+        return 'firefox';
+    }
+
+    return 'chrome';
+}
+
+async function findSystemBrowser() {
+    const candidates = [
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/snap/bin/chromium',
+        '/usr/lib/chromium-browser/chromium-browser',
+        '/usr/lib/chromium/chromium',
+    ];
+
+    for (const candidate of candidates) {
+        try {
+            await fs.access(candidate);
+            return candidate;
+        } catch {
+            // Keep scanning known browser paths.
+        }
+    }
+
+    return null;
+}

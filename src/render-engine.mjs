@@ -1,13 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer';
 import {
     extractTitle,
     renderMarkdownDocument,
-    resolvePaperLayout,
-    resolvePaperOrientation,
 } from './markdown-document.mjs';
+import { renderPdf, resolveBrowserLaunchOptions } from './browser-renderer.mjs';
+import { buildManifestMarkdown } from './manifest.mjs';
+import {
+    resolveDocumentRenderOptions,
+    resolveRenderOptions,
+    toDirectoryHref,
+} from './render-options.mjs';
 
 export async function renderMarkdownDirectory(options = {}) {
     const renderOptions = resolveRenderOptions(options);
@@ -129,41 +133,6 @@ export function formatError(error) {
     return String(error);
 }
 
-async function renderPdf(browser, { html, pdfPath, documentLabel }) {
-    const page = await browser.newPage();
-
-    try {
-        await page.setContent(html, {
-            waitUntil: 'networkidle0',
-        });
-        await page.emulateMediaType('print');
-        await page.waitForFunction(
-            () => document.body.dataset.mermaidReady === 'true' || Boolean(document.body.dataset.mermaidError),
-            {
-                timeout: 30_000,
-            },
-        );
-        const mermaidError = await page.evaluate(() => document.body.dataset.mermaidError || null);
-
-        if (mermaidError) {
-            throw new Error(`Mermaid render failed for ${documentLabel}: ${mermaidError}`);
-        }
-        await page.evaluate(async () => {
-            if (document.fonts?.ready) {
-                await document.fonts.ready;
-            }
-        });
-        await page.pdf({
-            path: pdfPath,
-            printBackground: true,
-            displayHeaderFooter: false,
-            preferCSSPageSize: true,
-        });
-    } finally {
-        await page.close();
-    }
-}
-
 function createLogger({ logToFile, renderLogPath, onProgress }) {
     return async (message) => {
         const line = `[${new Date().toISOString()}] ${message}\n`;
@@ -174,140 +143,6 @@ function createLogger({ logToFile, renderLogPath, onProgress }) {
 
         await onProgress(message);
     };
-}
-
-function buildManifestMarkdown(manifest) {
-    return [
-        '# PDF 산출물 목록',
-        '',
-        `생성일: ${formatDate(new Date())}`,
-        '',
-        ...manifest.map((item) => `- ${item.title}: \`${item.pdfName}\` (원본: \`${item.fileName}\`)`),
-        '',
-    ].join('\n');
-}
-
-function resolveRenderOptions(options = {}) {
-    const cwd = path.resolve(options.cwd ?? process.cwd());
-    const inputDir = path.resolve(cwd, options.inputDir ?? options.input ?? '.');
-    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? 'output');
-    const htmlTarget = options.htmlDir ?? options.html ?? null;
-    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
-    const logToFile = Boolean(options.logToFile ?? options.logFile);
-    const paperOrientation = resolvePaperOrientation(options.orientation);
-    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
-
-    return {
-        inputDir,
-        outputDir,
-        htmlDir,
-        chromePath: options.chromePath ?? null,
-        logToFile,
-        renderLogPath: path.join(outputDir, 'render.log'),
-        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
-        paperOrientation,
-        paperLayout,
-    };
-}
-
-function resolveDocumentRenderOptions(options = {}) {
-    if (typeof options.markdown !== 'string') {
-        throw new Error('renderMarkdownToHtml requires a markdown string.');
-    }
-
-    const cwd = path.resolve(options.cwd ?? process.cwd());
-    const baseDir = path.resolve(cwd, options.baseDir ?? options.inputDir ?? '.');
-    const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
-    const paperOrientation = resolvePaperOrientation(options.orientation);
-    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
-
-    return {
-        markdown: options.markdown,
-        title,
-        baseHref: options.baseHref ?? toDirectoryHref(baseDir),
-        paperLayout,
-    };
-}
-
-async function resolveBrowserLaunchOptions(cliChromePath) {
-    const executablePath = cliChromePath
-        || process.env.PUPPETEER_EXECUTABLE_PATH
-        || process.env.CHROME_PATH;
-
-    if (executablePath) {
-        return buildBrowserLaunchOptions(executablePath);
-    }
-
-    const systemBrowser = await findSystemBrowser();
-
-    if (systemBrowser) {
-        return buildBrowserLaunchOptions(systemBrowser);
-    }
-
-    if (process.platform === 'linux' && (process.arch === 'arm64' || process.arch === 'arm')) {
-        throw new Error(
-            'Linux ARM does not reliably support Puppeteer\'s bundled Chrome in this tool. '
-            + 'Install Chromium or Chrome on the board and run again with --chrome-path <path> '
-            + 'or set PUPPETEER_EXECUTABLE_PATH.',
-        );
-    }
-
-    return {};
-}
-
-function buildBrowserLaunchOptions(executablePath) {
-    const browser = detectBrowserType(executablePath);
-
-    if (browser === 'firefox') {
-        throw new Error(
-            'Firefox is not supported by this renderer. '
-            + 'Use a Chrome or Chromium executable with --chrome-path '
-            + 'or set PUPPETEER_EXECUTABLE_PATH to a Chrome/Chromium binary.',
-        );
-    }
-
-    return {
-        browser,
-        executablePath,
-        args: [
-            '--no-sandbox',
-            '--disable-gpu',
-            '--allow-file-access-from-files',
-        ],
-    };
-}
-
-function detectBrowserType(executablePath) {
-    const lower = executablePath.toLowerCase();
-
-    if (lower.includes('firefox')) {
-        return 'firefox';
-    }
-
-    return 'chrome';
-}
-
-async function findSystemBrowser() {
-    const candidates = [
-        '/usr/bin/chromium-browser',
-        '/usr/bin/chromium',
-        '/usr/bin/google-chrome',
-        '/usr/bin/google-chrome-stable',
-        '/snap/bin/chromium',
-        '/usr/lib/chromium-browser/chromium-browser',
-        '/usr/lib/chromium/chromium',
-    ];
-
-    for (const candidate of candidates) {
-        try {
-            await fs.access(candidate);
-            return candidate;
-        } catch {
-            // Keep scanning known browser paths.
-        }
-    }
-
-    return null;
 }
 
 async function getMarkdownFiles(directoryPath) {
@@ -352,16 +187,4 @@ function toTitle(fileName) {
         .split('-')
         .map((part) => part[0]?.toUpperCase() + part.slice(1))
         .join(' ');
-}
-
-function formatDate(date) {
-    const yyyy = String(date.getFullYear());
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${yyyy}.${mm}.${dd}`;
-}
-
-function toDirectoryHref(directoryPath) {
-    const href = pathToFileURL(directoryPath).href;
-    return href.endsWith('/') ? href : `${href}/`;
 }
