@@ -18,7 +18,6 @@ It is designed for documentation export workflows where the same Markdown source
 Fastest successful path:
 
 ```bash
-npm install
 npx md-to-pdf-renderer --input fixtures/readme-showcase --output out --log-file
 ```
 
