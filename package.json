@@ -26,6 +26,9 @@
     "bin": {
         "md-to-pdf-renderer": "./bin/md-to-pdf-renderer.mjs"
     },
+    "exports": {
+        ".": "./src/render-pdfs.mjs"
+    },
     "files": [
         "bin",
         "src",
@@ -36,7 +39,8 @@
         "access": "public"
     },
     "scripts": {
-        "render": "node src/render-pdfs.mjs"
+        "render": "node src/render-pdfs.mjs",
+        "test": "node --test"
     },
     "dependencies": {
         "katex": "^0.16.42",

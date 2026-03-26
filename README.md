@@ -125,6 +125,32 @@ Run from the repository root:
 node src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
 ```
 
+### Programmatic API
+
+```js
+import { renderMarkdownDirectory, renderMarkdownToHtml } from 'md-to-pdf-renderer';
+
+await renderMarkdownDirectory({
+  inputDir: 'docs',
+  outputDir: 'out',
+  htmlDir: 'out/html',
+  logFile: true,
+});
+
+const html = await renderMarkdownToHtml({
+  markdown: '# Hello\n\n[[TOC]]',
+  title: 'Hello',
+  baseDir: 'docs',
+});
+```
+
+Available exports:
+
+- `renderMarkdownDirectory(options)` renders a directory of Markdown files to PDF and returns output metadata.
+- `renderMarkdownToHtml(options)` renders a single Markdown string to HTML without writing files.
+- `main(argv, runtime)` runs the CLI programmatically.
+- `parseArgs(argv)` and `getHelpText()` are exposed for custom wrappers.
+
 ### CLI options
 
 | Option | Description | Default |

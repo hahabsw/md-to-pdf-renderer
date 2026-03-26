@@ -8,84 +8,84 @@ import markdownItTaskLists from 'markdown-it-task-lists';
 import puppeteer from 'puppeteer';
 
 const require = createRequire(import.meta.url);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-let fatalErrorReported = false;
-
-process.on('uncaughtException', handleFatalError);
-process.on('unhandledRejection', handleFatalError);
-
-const args = parseArgs(process.argv.slice(2));
-
-if (args.help) {
-    printHelp();
-    process.exit(0);
-}
-
-const inputDir = path.resolve(process.cwd(), args.input ?? '.');
-const pdfDir = path.resolve(process.cwd(), args.output ?? 'output');
-const htmlDir = args.html ? path.resolve(process.cwd(), args.html) : null;
-const renderLogPath = path.join(pdfDir, 'render.log');
-const logToFile = Boolean(args.logFile);
-const paperOrientation = resolvePaperOrientation(args.orientation);
-const paperLayout = resolvePaperLayout(args.paperSize, paperOrientation);
+const __filename = fileURLToPath(import.meta.url);
 const katexCssPath = require.resolve('katex/dist/katex.min.css');
-const katexCss = await loadKatexCss();
 const katex = require('katex');
 const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
+let rendererResourcesPromise;
 
-const md = new MarkdownIt({
-    html: true,
-    linkify: true,
-    typographer: true,
-});
+function createMarkdownRenderer() {
+    const md = new MarkdownIt({
+        html: true,
+        linkify: true,
+        typographer: true,
+    });
 
-md.use(markdownItFootnote);
-md.use(katexPlugin, {
-    throwOnError: false,
-});
-md.use(markdownItTaskLists, {
-    enabled: true,
-    label: true,
-    labelAfter: true,
-});
-md.use(calloutPlugin);
-md.use(tableOfContentsPlugin);
+    md.use(markdownItFootnote);
+    md.use(katexPlugin, {
+        throwOnError: false,
+    });
+    md.use(markdownItTaskLists, {
+        enabled: true,
+        label: true,
+        labelAfter: true,
+    });
+    md.use(calloutPlugin);
+    md.use(tableOfContentsPlugin);
 
-md.renderer.rules.fence = (tokens, idx) => {
-    const token = tokens[idx];
-    const info = (token.info || '').trim();
-    const content = token.content.trimEnd();
+    md.renderer.rules.fence = (tokens, idx) => {
+        const token = tokens[idx];
+        const info = (token.info || '').trim();
+        const content = token.content.trimEnd();
 
-    if (info === 'mermaid') {
-        const caption = detectDiagramCaption(content);
+        if (info === 'mermaid') {
+            const caption = detectDiagramCaption(content);
+            return `
+                <figure class="diagram-card">
+                    <figcaption>${md.utils.escapeHtml(caption)}</figcaption>
+                    <div class="mermaid">${md.utils.escapeHtml(content)}</div>
+                </figure>
+            `;
+        }
+
+        if (info === 'text') {
+            return `
+                <div class="code-card text-card">
+                    <div class="code-label">TEXT</div>
+                    <pre><code>${md.utils.escapeHtml(content)}</code></pre>
+                </div>
+            `;
+        }
+
+        const label = info ? info.toUpperCase() : 'CODE';
         return `
-            <figure class="diagram-card">
-                <figcaption>${md.utils.escapeHtml(caption)}</figcaption>
-                <div class="mermaid">${md.utils.escapeHtml(content)}</div>
-            </figure>
-        `;
-    }
-
-    if (info === 'text') {
-        return `
-            <div class="code-card text-card">
-                <div class="code-label">TEXT</div>
+            <div class="code-card">
+                <div class="code-label">${md.utils.escapeHtml(label)}</div>
                 <pre><code>${md.utils.escapeHtml(content)}</code></pre>
             </div>
         `;
+    };
+
+    return md;
+}
+
+async function getRendererResources() {
+    if (!rendererResourcesPromise) {
+        rendererResourcesPromise = Promise.all([
+            loadKatexCss(katexCssPath),
+            Promise.resolve(createMarkdownRenderer()),
+        ]).then(([katexCss, md]) => ({
+            katexCss,
+            md,
+            mermaidModuleUrl,
+        }));
     }
 
-    const label = info ? info.toUpperCase() : 'CODE';
-    return `
-        <div class="code-card">
-            <div class="code-label">${md.utils.escapeHtml(label)}</div>
-            <pre><code>${md.utils.escapeHtml(content)}</code></pre>
-        </div>
-    `;
-};
+    return rendererResourcesPromise;
+}
 
-function buildTemplateCss() {
+function buildTemplateCss(paperLayout) {
     return `
     :root {
         --ink: #1f2937;
@@ -594,96 +594,126 @@ function buildTemplateCss() {
 `;
 }
 
-await fs.mkdir(pdfDir, { recursive: true });
+export async function renderMarkdownDirectory(options = {}) {
+    const renderOptions = resolveRenderOptions(options);
+    const { md, katexCss, mermaidModuleUrl: mermaidScriptUrl } = await getRendererResources();
+    const logProgress = createLogger(renderOptions);
 
-if (htmlDir) {
-    await fs.mkdir(htmlDir, { recursive: true });
-}
+    await fs.mkdir(renderOptions.outputDir, { recursive: true });
 
-if (logToFile) {
-    await fs.writeFile(renderLogPath, '', 'utf8');
-}
+    if (renderOptions.htmlDir) {
+        await fs.mkdir(renderOptions.htmlDir, { recursive: true });
+    }
 
-await logProgress(
-    `Render started.
-    input=${inputDir}
-    output=${pdfDir}
-    html=${htmlDir ?? 'disabled'}
-    paperSize=${paperLayout.sizeDisplayValue}
-    orientation=${paperOrientation.displayValue}
-    logFile=${logToFile ? renderLogPath : 'disabled'}`,
-);
+    if (renderOptions.logToFile) {
+        await fs.writeFile(renderOptions.renderLogPath, '', 'utf8');
+    }
 
-const manifest = [];
-let browser;
+    await logProgress(
+        `Render started.
+    input=${renderOptions.inputDir}
+    output=${renderOptions.outputDir}
+    html=${renderOptions.htmlDir ?? 'disabled'}
+    paperSize=${renderOptions.paperLayout.sizeDisplayValue}
+    orientation=${renderOptions.paperOrientation.displayValue}
+    logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,
+    );
 
-try {
-    const launchOptions = await resolveBrowserLaunchOptions(args.chromePath);
+    const manifest = [];
+    let browser;
 
-    browser = await puppeteer.launch({
-        ...launchOptions,
-        headless: true,
-    });
+    try {
+        const launchOptions = await resolveBrowserLaunchOptions(renderOptions.chromePath);
 
-    const files = await getMarkdownFiles(inputDir);
-
-    await logProgress(`Discovered ${files.length} markdown file(s).`);
-
-    for (const [index, fileName] of files.entries()) {
-        const sourcePath = path.join(inputDir, fileName);
-        const markdown = await fs.readFile(sourcePath, 'utf8');
-        const title = extractTitle(markdown) ?? toTitle(fileName);
-        const html = buildHtml({
-            markdown,
-            title,
-            baseHref: toDirectoryHref(inputDir),
+        browser = await puppeteer.launch({
+            ...launchOptions,
+            headless: true,
         });
-        const baseName = fileName.replace(/\.md$/i, '');
-        const pdfPath = path.join(pdfDir, `${baseName}.pdf`);
-        const htmlPath = htmlDir ? path.join(htmlDir, `${baseName}.html`) : null;
 
-        await logProgress(`[${index + 1}/${files.length}] Rendering ${fileName}`);
-        if (htmlPath) {
-            await fs.writeFile(htmlPath, html, 'utf8');
+        const files = await getMarkdownFiles(renderOptions.inputDir);
+
+        await logProgress(`Discovered ${files.length} markdown file(s).`);
+
+        for (const [index, fileName] of files.entries()) {
+            const sourcePath = path.join(renderOptions.inputDir, fileName);
+            const markdown = await fs.readFile(sourcePath, 'utf8');
+            const title = extractTitle(markdown) ?? toTitle(fileName);
+            const html = buildHtml({
+                markdown,
+                title,
+                baseHref: toDirectoryHref(renderOptions.inputDir),
+                katexCss,
+                md,
+                mermaidModuleUrl: mermaidScriptUrl,
+                paperLayout: renderOptions.paperLayout,
+            });
+            const baseName = fileName.replace(/\.md$/i, '');
+            const pdfPath = path.join(renderOptions.outputDir, `${baseName}.pdf`);
+            const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, `${baseName}.html`) : null;
+
+            await logProgress(`[${index + 1}/${files.length}] Rendering ${fileName}`);
+            if (htmlPath) {
+                await fs.writeFile(htmlPath, html, 'utf8');
+            }
+            await renderPdf(browser, {
+                html,
+                pdfPath,
+                documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
+            });
+            await logProgress(`[${index + 1}/${files.length}] Completed ${fileName} -> ${baseName}.pdf`);
+
+            manifest.push({
+                title,
+                fileName,
+                pdfName: `${baseName}.pdf`,
+                pdfPath,
+                htmlPath,
+                sourcePath,
+            });
         }
-        await renderPdf(browser, {
-            html,
-            pdfPath,
-            documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
-        });
-        await logProgress(`[${index + 1}/${files.length}] Completed ${fileName} -> ${baseName}.pdf`);
+        await logProgress(`Rendered ${manifest.length} PDF file(s).`);
 
-        manifest.push({
-            title,
-            fileName,
-            pdfName: `${baseName}.pdf`,
-        });
-    }
-    await logProgress(`Rendered ${manifest.length} PDF file(s).`);
+        const manifestPath = path.join(renderOptions.outputDir, 'README.md');
+        const manifestMarkdown = buildManifestMarkdown(manifest);
 
-    const manifestMarkdown = [
-        '# PDF 산출물 목록',
-        '',
-        `생성일: ${formatDate(new Date())}`,
-        '',
-        ...manifest.map((item) => `- ${item.title}: \`${item.pdfName}\` (원본: \`${item.fileName}\`)`),
-        '',
-    ].join('\n');
+        await fs.writeFile(manifestPath, manifestMarkdown, 'utf8');
+        await logProgress(`Wrote manifest: ${manifestPath}`);
+        await logProgress('Render finished successfully.');
 
-    await fs.writeFile(path.join(pdfDir, 'README.md'), manifestMarkdown, 'utf8');
-    await logProgress(`Wrote manifest: ${path.join(pdfDir, 'README.md')}`);
-    await logProgress('Render finished successfully.');
-} catch (error) {
-    await logProgress(`Render failed: ${formatError(error)}`);
-    fatalErrorReported = true;
-    process.exitCode = 1;
-} finally {
-    if (browser) {
-        await browser.close();
+        return {
+            inputDir: renderOptions.inputDir,
+            outputDir: renderOptions.outputDir,
+            htmlDir: renderOptions.htmlDir,
+            manifestPath,
+            renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
+            files: manifest,
+        };
+    } catch (error) {
+        await logProgress(`Render failed: ${formatError(error)}`);
+        throw error;
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
     }
 }
 
-function buildHtml({ markdown, title, baseHref }) {
+export async function renderMarkdownToHtml(options) {
+    const renderOptions = resolveDocumentRenderOptions(options);
+    const { md, katexCss, mermaidModuleUrl: mermaidScriptUrl } = await getRendererResources();
+
+    return buildHtml({
+        markdown: renderOptions.markdown,
+        title: renderOptions.title,
+        baseHref: renderOptions.baseHref,
+        katexCss,
+        md,
+        mermaidModuleUrl: mermaidScriptUrl,
+        paperLayout: renderOptions.paperLayout,
+    });
+}
+
+function buildHtml({ markdown, title, baseHref, katexCss, md, mermaidModuleUrl, paperLayout }) {
     const rendered = md.render(markdown);
 
     return `<!doctype html>
@@ -694,7 +724,7 @@ function buildHtml({ markdown, title, baseHref }) {
     <title>${escapeHtml(title)}</title>
     <base href="${escapeHtml(baseHref)}" />
     <style>${katexCss}</style>
-    <style>${buildTemplateCss()}</style>
+    <style>${buildTemplateCss(paperLayout)}</style>
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
 
@@ -1260,9 +1290,9 @@ function uniqueSlug(baseSlug, slugCounts) {
     return `${baseSlug}-${count + 1}`;
 }
 
-async function loadKatexCss() {
-    const css = await fs.readFile(katexCssPath, 'utf8');
-    const katexDistDir = path.dirname(katexCssPath);
+async function loadKatexCss(cssPath) {
+    const css = await fs.readFile(cssPath, 'utf8');
+    const katexDistDir = path.dirname(cssPath);
 
     return css.replace(/url\((fonts\/[^)]+)\)/g, (_match, relativePath) => {
         const cleanedPath = relativePath.replace(/^['"]|['"]$/g, '');
@@ -1300,16 +1330,6 @@ function toDirectoryHref(directoryPath) {
     return href.endsWith('/') ? href : `${href}/`;
 }
 
-async function logProgress(message) {
-    const line = `[${new Date().toISOString()}] ${message}\n`;
-
-    if (logToFile) {
-        await fs.appendFile(renderLogPath, line, 'utf8');
-    }
-
-    console.log(message);
-}
-
 function formatError(error) {
     if (error instanceof Error) {
         return error.message;
@@ -1318,15 +1338,70 @@ function formatError(error) {
     return String(error);
 }
 
-function handleFatalError(error) {
-    if (fatalErrorReported) {
-        process.exitCode = 1;
-        return;
+function createLogger({ logToFile, renderLogPath, onProgress }) {
+    return async (message) => {
+        const line = `[${new Date().toISOString()}] ${message}\n`;
+
+        if (logToFile) {
+            await fs.appendFile(renderLogPath, line, 'utf8');
+        }
+
+        await onProgress(message);
+    };
+}
+
+function buildManifestMarkdown(manifest) {
+    return [
+        '# PDF 산출물 목록',
+        '',
+        `생성일: ${formatDate(new Date())}`,
+        '',
+        ...manifest.map((item) => `- ${item.title}: \`${item.pdfName}\` (원본: \`${item.fileName}\`)`),
+        '',
+    ].join('\n');
+}
+
+function resolveRenderOptions(options = {}) {
+    const cwd = path.resolve(options.cwd ?? process.cwd());
+    const inputDir = path.resolve(cwd, options.inputDir ?? options.input ?? '.');
+    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? 'output');
+    const htmlTarget = options.htmlDir ?? options.html ?? null;
+    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
+    const logToFile = Boolean(options.logToFile ?? options.logFile);
+    const paperOrientation = resolvePaperOrientation(options.orientation);
+    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+
+    return {
+        cwd,
+        inputDir,
+        outputDir,
+        htmlDir,
+        chromePath: options.chromePath ?? null,
+        logToFile,
+        renderLogPath: path.join(outputDir, 'render.log'),
+        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
+        paperOrientation,
+        paperLayout,
+    };
+}
+
+function resolveDocumentRenderOptions(options = {}) {
+    if (typeof options.markdown !== 'string') {
+        throw new Error('renderMarkdownToHtml requires a markdown string.');
     }
 
-    fatalErrorReported = true;
-    console.error(formatError(error));
-    process.exitCode = 1;
+    const cwd = path.resolve(options.cwd ?? process.cwd());
+    const baseDir = path.resolve(cwd, options.baseDir ?? options.inputDir ?? '.');
+    const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
+    const paperOrientation = resolvePaperOrientation(options.orientation);
+    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+
+    return {
+        markdown: options.markdown,
+        title,
+        baseHref: options.baseHref ?? toDirectoryHref(baseDir),
+        paperLayout,
+    };
 }
 
 async function resolveBrowserLaunchOptions(cliChromePath) {
@@ -1410,8 +1485,8 @@ async function findSystemBrowser() {
     return null;
 }
 
-function printHelp() {
-    const helpText = `
+export function getHelpText() {
+    return `
 md-to-pdf-renderer
 
 Convert top-level Markdown files in a directory into styled PDF files, with optional HTML output.
@@ -1434,9 +1509,7 @@ Examples:
   md-to-pdf-renderer --input docs --output pdf --html pdf/html
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
-`;
-
-    process.stdout.write(helpText.trimStart());
+`.trimStart();
 }
 
 function resolvePaperOrientation(value = 'portrait') {
@@ -1528,7 +1601,7 @@ async function getMarkdownFiles(directoryPath) {
     return markdownFiles;
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
     const parsed = {};
 
     for (let i = 0; i < argv.length; i += 1) {
@@ -1581,4 +1654,41 @@ function parseArgs(argv) {
     }
 
     return parsed;
+}
+
+export async function main(argv = process.argv.slice(2), runtime = {}) {
+    const args = parseArgs(argv);
+    const stdout = runtime.stdout ?? process.stdout;
+    const stderr = runtime.stderr ?? process.stderr;
+    const cwd = runtime.cwd ?? process.cwd();
+
+    if (args.help) {
+        stdout.write(getHelpText());
+        return 0;
+    }
+
+    try {
+        await renderMarkdownDirectory({
+            cwd,
+            input: args.input,
+            output: args.output,
+            html: args.html,
+            paperSize: args.paperSize,
+            orientation: args.orientation,
+            logFile: args.logFile,
+            chromePath: args.chromePath,
+            onProgress: (message) => {
+                stdout.write(`${message}\n`);
+            },
+        });
+        return 0;
+    } catch (error) {
+        stderr.write(`${formatError(error)}\n`);
+        return 1;
+    }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+    const exitCode = await main();
+    process.exitCode = exitCode;
 }
