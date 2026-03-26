@@ -26,9 +26,10 @@ Generated output:
 - `fixtures/readme-showcase-output/rendering-showcase.pdf`
 - `fixtures/readme-showcase-output/html/rendering-showcase.html`
 
-![Rendering showcase overview](docs/readme-assets/showcase-overview.png)
-
-![Rendering showcase details](docs/readme-assets/showcase-details.png)
+<p>
+  <img src="docs/readme-assets/showcase-overview.png" alt="Rendering showcase overview" width="49%" />
+  <img src="docs/readme-assets/showcase-details.png" alt="Rendering showcase details" width="49%" />
+</p>
 
 ### What it does
 
@@ -170,9 +171,10 @@ output/
 - `fixtures/readme-showcase-output/rendering-showcase.pdf`
 - `fixtures/readme-showcase-output/html/rendering-showcase.html`
 
-![렌더링 쇼케이스 개요](docs/readme-assets/showcase-overview.png)
-
-![렌더링 쇼케이스 상세](docs/readme-assets/showcase-details.png)
+<p>
+  <img src="docs/readme-assets/showcase-overview.png" alt="렌더링 쇼케이스 개요" width="49%" />
+  <img src="docs/readme-assets/showcase-details.png" alt="렌더링 쇼케이스 상세" width="49%" />
+</p>
 
 ### 하는 일
 
