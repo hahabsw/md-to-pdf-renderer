@@ -17,6 +17,19 @@ It is designed for documentation export workflows where the same Markdown source
 - Inline and block math rendering with KaTeX
 - A generated manifest file for produced PDFs
 
+### Preview
+
+Example source: `fixtures/readme-showcase/rendering-showcase.md`
+
+Generated output:
+
+- `fixtures/readme-showcase-output/rendering-showcase.pdf`
+- `fixtures/readme-showcase-output/html/rendering-showcase.html`
+
+![Rendering showcase overview](docs/readme-assets/showcase-overview.png)
+
+![Rendering showcase details](docs/readme-assets/showcase-details.png)
+
 ### What it does
 
 When you run the renderer:
@@ -39,7 +52,6 @@ When you run the renderer:
 
 - `markdown-it`
 - `markdown-it-footnote`
-- `markdown-it-katex`
 - `markdown-it-task-lists`
 - `katex`
 - `mermaid`
@@ -149,6 +161,19 @@ output/
 - KaTeX 기반 인라인/블록 수식 렌더링
 - 생성된 PDF 목록용 매니페스트 파일 출력
 
+### 미리보기
+
+예제 원본: `fixtures/readme-showcase/rendering-showcase.md`
+
+생성 결과:
+
+- `fixtures/readme-showcase-output/rendering-showcase.pdf`
+- `fixtures/readme-showcase-output/html/rendering-showcase.html`
+
+![렌더링 쇼케이스 개요](docs/readme-assets/showcase-overview.png)
+
+![렌더링 쇼케이스 상세](docs/readme-assets/showcase-details.png)
+
 ### 하는 일
 
 렌더러를 실행하면 다음 순서로 동작합니다.
@@ -171,7 +196,6 @@ output/
 
 - `markdown-it`
 - `markdown-it-footnote`
-- `markdown-it-katex`
 - `markdown-it-task-lists`
 - `katex`
 - `mermaid`

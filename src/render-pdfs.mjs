@@ -813,6 +813,11 @@ async function renderPdf(browser, htmlPath, pdfPath) {
                 timeout: 30_000,
             },
         );
+        const mermaidError = await page.evaluate(() => document.body.dataset.mermaidError || null);
+
+        if (mermaidError) {
+            throw new Error(`Mermaid render failed for ${path.basename(htmlPath)}: ${mermaidError}`);
+        }
         await page.evaluate(async () => {
             if (document.fonts?.ready) {
                 await document.fonts.ready;

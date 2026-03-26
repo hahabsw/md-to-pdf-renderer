@@ -1,6 +1,6 @@
 {
     "name": "md-to-pdf-renderer",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "type": "module",
     "description": "Markdown to PDF renderer with Mermaid support",
     "bin": {
