@@ -13,6 +13,7 @@ export function resolveRenderOptions(options = {}) {
     const htmlTarget = options.htmlDir ?? options.html ?? null;
     const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
     const logToFile = Boolean(options.logToFile ?? options.logFile);
+    const writeManifest = Boolean(options.writeManifest ?? options.manifest);
     const paperOrientation = resolvePaperOrientation(options.orientation);
     const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
 
@@ -22,6 +23,8 @@ export function resolveRenderOptions(options = {}) {
         htmlDir,
         chromePath: options.chromePath ?? null,
         logToFile,
+        writeManifest,
+        manifestPath: path.join(outputDir, 'README.md'),
         renderLogPath: path.join(outputDir, 'render.log'),
         onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
         paperOrientation,
@@ -36,15 +39,20 @@ export function resolveFileRenderOptions(options = {}) {
     const htmlTarget = options.htmlDir ?? options.html ?? null;
     const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
     const logToFile = Boolean(options.logToFile ?? options.logFile);
+    const writeManifest = Boolean(options.writeManifest ?? options.manifest);
     const paperOrientation = resolvePaperOrientation(options.orientation);
     const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+    const outputFileName = normalizePdfFileName(options.outputFileName ?? options.outputFile ?? null);
 
     return {
         inputFile,
         outputDir,
+        outputFileName,
         htmlDir,
         chromePath: options.chromePath ?? null,
         logToFile,
+        writeManifest,
+        manifestPath: path.join(outputDir, 'README.md'),
         renderLogPath: path.join(outputDir, 'render.log'),
         onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
         paperOrientation,
@@ -81,10 +89,12 @@ export function resolveStringRenderOptions(options = {}) {
     const htmlTarget = options.htmlDir ?? options.html ?? null;
     const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
     const logToFile = Boolean(options.logToFile ?? options.logFile);
+    const writeManifest = Boolean(options.writeManifest ?? options.manifest);
     const paperOrientation = resolvePaperOrientation(options.orientation);
     const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
     const baseDir = path.resolve(cwd, options.baseDir ?? options.inputDir ?? '.');
     const fileName = normalizeMarkdownFileName(options.fileName ?? options.name ?? 'document.md');
+    const outputFileName = normalizePdfFileName(options.outputFileName ?? options.outputFile ?? null);
     const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
 
     return {
@@ -92,9 +102,12 @@ export function resolveStringRenderOptions(options = {}) {
         fileName,
         title,
         outputDir,
+        outputFileName,
         htmlDir,
         chromePath: options.chromePath ?? null,
         logToFile,
+        writeManifest,
+        manifestPath: path.join(outputDir, 'README.md'),
         renderLogPath: path.join(outputDir, 'render.log'),
         onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
         paperOrientation,
@@ -116,4 +129,18 @@ function normalizeMarkdownFileName(value) {
     }
 
     return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
+}
+
+function normalizePdfFileName(value) {
+    if (value == null) {
+        return null;
+    }
+
+    const trimmed = String(value).trim();
+
+    if (!trimmed) {
+        return null;
+    }
+
+    return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
 }

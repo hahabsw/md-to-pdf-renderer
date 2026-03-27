@@ -11,7 +11,7 @@ It is designed for documentation export workflows where the same Markdown source
 - Task lists, footnotes, and GitHub-style callouts
 - `[[TOC]]` placeholder based table of contents
 - Inline and block math rendering with KaTeX
-- A generated manifest file for produced PDFs
+- Optional manifest generation for produced PDFs
 
 ### Quickstart For Humans And Agents
 
@@ -24,13 +24,13 @@ npx md-to-pdf-renderer --input fixtures/readme-showcase --output out --log-file
 Expected output:
 
 - `out/rendering-showcase.pdf`
-- `out/README.md`
 - `out/render.log`
 
 Tool contract:
 
 - Input is the top-level `*.md` files in the `--input` directory.
-- Output is `*.pdf` and a manifest `README.md` in `--output`, or in the current working directory when `--output` is omitted.
+- Output is `*.pdf` in `--output`, or in the current working directory when `--output` is omitted.
+- A manifest `README.md` is only written when `--manifest` is provided.
 - Intermediate HTML files are only written when `--html <dir>` is provided.
 - For automation, prefer passing both `--input` and `--output` explicitly instead of relying on defaults.
 - The command exits with a non-zero status when the input directory is missing, empty, or when Mermaid rendering fails.
@@ -62,7 +62,7 @@ When you run the renderer:
 4. It renders Mermaid blocks before printing.
 5. It writes the final PDF files.
 6. It optionally writes intermediate HTML files when `--html <dir>` is set.
-7. It creates a `README.md` manifest inside the PDF output directory.
+7. It optionally creates a `README.md` manifest inside the PDF output directory when `--manifest` is set.
 
 ### Requirements
 
@@ -102,7 +102,25 @@ This writes output files into the current working directory by default.
 Single file:
 
 ```bash
+npx md-to-pdf-renderer --input docs/guide.md
+```
+
+Single file with a custom PDF name:
+
+```bash
+npx md-to-pdf-renderer --input docs/guide.md --output-file guide-v2.pdf
+```
+
+Single file with a custom output directory:
+
+```bash
 npx md-to-pdf-renderer --input docs/guide.md --output output
+```
+
+Write a manifest too:
+
+```bash
+npx md-to-pdf-renderer --input input --output output --manifest
 ```
 
 Show CLI help:
@@ -133,17 +151,52 @@ Run from the repository root:
 node src/render-pdfs.mjs --input input --output output --paper-size A4 --orientation portrait
 ```
 
+### CLI options
+
+| Option | Description | Default |
+| ---- | ---- | ---- |
+| `--input` | Directory or Markdown file to render | Current working directory |
+| `--output` | Directory where PDF files are written | Current working directory |
+| `--output-file` | PDF file name for single-file input only | Source file name with `.pdf` |
+| `--html` | Also write intermediate HTML files to this directory | Disabled |
+| `--manifest` | Also write `<output>/README.md` manifest | Disabled |
+| `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
+| `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |
+| `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
+| `--chrome-path` | Optional path to a custom Chrome or Chromium executable | Bundled Puppeteer browser |
+
 ### Programmatic API
 
 ```js
 import { renderMarkdownDirectory, renderMarkdownToHtml } from 'md-to-pdf-renderer';
 import { renderMarkdownFile, renderMarkdownPath, renderMarkdownString } from 'md-to-pdf-renderer';
 
+await renderMarkdownPath({
+  input: 'docs/guide.md',
+  output: 'out',
+});
+
 await renderMarkdownDirectory({
   inputDir: 'docs',
   outputDir: 'out',
   htmlDir: 'out/html',
+  manifest: true,
   logFile: true,
+});
+
+await renderMarkdownFile({
+  inputFile: 'docs/guide.md',
+  outputDir: 'out',
+  manifest: true,
+  outputFileName: 'guide-v2.pdf',
+});
+
+await renderMarkdownString({
+  markdown: '# In Memory\n\nHello from a variable.',
+  fileName: 'in-memory.md',
+  outputDir: 'out',
+  manifest: true,
+  outputFileName: 'in-memory-final.pdf',
 });
 
 const html = await renderMarkdownToHtml({
@@ -151,33 +204,15 @@ const html = await renderMarkdownToHtml({
   title: 'Hello',
   baseDir: 'docs',
 });
-
-await renderMarkdownFile({
-  inputFile: 'docs/guide.md',
-  outputDir: 'out',
-});
-
-await renderMarkdownPath({
-  input: 'docs/guide.md',
-  output: 'out',
-});
-
-await renderMarkdownString({
-  markdown: '# In Memory\n\nHello from a variable.',
-  fileName: 'in-memory.md',
-  outputDir: 'out',
-});
 ```
 
 Available exports:
 
+- `renderMarkdownPath(options)` auto-detects whether `input` is a directory or a single Markdown file.
 - `renderMarkdownDirectory(options)` renders a directory of Markdown files to PDF and returns output metadata.
 - `renderMarkdownFile(options)` renders one Markdown file to PDF and returns file metadata.
-- `renderMarkdownPath(options)` auto-detects whether `input` is a directory or a single Markdown file.
 - `renderMarkdownString(options)` renders Markdown content from a string to PDF and returns file metadata.
 - `renderMarkdownToHtml(options)` renders a single Markdown string to HTML without writing files.
-- `main(argv, runtime)` runs the CLI programmatically.
-- `parseArgs(argv)` and `getHelpText()` are exposed for custom wrappers.
 
 `renderMarkdownDirectory(options)` options:
 
@@ -185,8 +220,9 @@ Available exports:
 | ---- | ---- | ---- | ---- |
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `inputDir` / `input` | `string` | `.` | Directory containing top-level `*.md` files |
-| `outputDir` / `output` | `string` | `.` | Directory where PDFs and manifest are written |
+| `outputDir` / `output` | `string` | `.` | Directory where PDFs are written |
 | `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML files are also written |
+| `writeManifest` / `manifest` | `boolean` | `false` | Whether to write `<output>/README.md` |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
 | `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
@@ -200,7 +236,7 @@ Available exports:
 | `inputDir` | `string` | Absolute input directory path |
 | `outputDir` | `string` | Absolute output directory path |
 | `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
-| `manifestPath` | `string` | Absolute path to generated manifest |
+| `manifestPath` | `string \| null` | Absolute path to generated manifest when enabled |
 | `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
 | `files` | `Array<{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }>` | Per-file output metadata |
 
@@ -210,8 +246,10 @@ Available exports:
 | ---- | ---- | ---- | ---- |
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `inputFile` / `input` | `string` | Required | Markdown file to render |
-| `outputDir` / `output` | `string` | `.` | Directory where PDF and manifest are written |
+| `outputDir` / `output` | `string` | `.` | Directory where PDFs are written |
+| `outputFileName` / `outputFile` | `string` | Source file name with `.pdf` | Custom PDF file name for the rendered output |
 | `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML file is also written |
+| `writeManifest` / `manifest` | `boolean` | `false` | Whether to write `<output>/README.md` |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
 | `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
@@ -225,7 +263,7 @@ Available exports:
 | `inputFile` | `string` | Absolute input file path |
 | `outputDir` | `string` | Absolute output directory path |
 | `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
-| `manifestPath` | `string` | Absolute path to generated manifest |
+| `manifestPath` | `string \| null` | Absolute path to generated manifest when enabled |
 | `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
 | `file` | `{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }` | Output metadata for the rendered file |
 
@@ -234,6 +272,8 @@ Available exports:
 - Accepts `input` as either a directory path or a single Markdown file path.
 - Reuses the same output options as `renderMarkdownDirectory()` and `renderMarkdownFile()`.
 - Returns the directory result shape for directory input and the single-file result shape for file input.
+- Supports `outputFileName` only when `input` resolves to a single Markdown file.
+- Supports `manifest` to enable manifest generation for either mode.
 
 `renderMarkdownString(options)` options:
 
@@ -245,8 +285,10 @@ Available exports:
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
 | `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
-| `outputDir` / `output` | `string` | `.` | Directory where PDF and manifest are written |
+| `outputDir` / `output` | `string` | `.` | Directory where PDFs are written |
+| `outputFileName` / `outputFile` | `string` | Virtual file name with `.pdf` | Custom PDF file name for the rendered output |
 | `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML file is also written |
+| `writeManifest` / `manifest` | `boolean` | `false` | Whether to write `<output>/README.md` |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
 | `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
@@ -260,7 +302,7 @@ Available exports:
 | `fileName` | `string` | Virtual input file name used for naming outputs |
 | `outputDir` | `string` | Absolute output directory path |
 | `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
-| `manifestPath` | `string` | Absolute path to generated manifest |
+| `manifestPath` | `string \| null` | Absolute path to generated manifest when enabled |
 | `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
 | `file` | `{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }` | Output metadata for the rendered Markdown string. `sourcePath` is `null` |
 
@@ -276,29 +318,12 @@ Available exports:
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
 
-`main(argv, runtime)`:
-
-- Returns `0` on success and `1` on failure.
-- Accepts injectable `stdout`, `stderr`, and `cwd` so wrapper CLIs can capture output without spawning a child process.
-
-### CLI options
-
-| Option | Description | Default |
-| ---- | ---- | ---- |
-| `--input` | Directory or Markdown file to render | Current working directory |
-| `--output` | Directory where PDF files are written | Current working directory |
-| `--html` | Also write intermediate HTML files to this directory | Disabled |
-| `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
-| `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |
-| `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
-| `--chrome-path` | Optional path to a custom Chrome or Chromium executable | Bundled Puppeteer browser |
-
 ### Output structure
 
 The tool generates:
 
 - `<output>/*.pdf`
-- `<output>/README.md`
+- `<output>/README.md` only when `--manifest` is enabled
 - `<output>/render.log` when `--log-file` is enabled
 - `<html>/*.html` only when `--html <dir>` is enabled
 
@@ -312,7 +337,6 @@ input/
 output/
   01-overview.pdf
   02-architecture.pdf
-  README.md
   render.log
 
 output/html/
@@ -334,6 +358,7 @@ output/html/
 - The generated PDFs use print CSS and support `--paper-size` plus `--orientation`.
 - Render progress is always printed to the console.
 - Intermediate HTML files are skipped by default and are only persisted when `--html <dir>` is passed.
+- `<output>/README.md` is only written when `--manifest` is enabled.
 - `<output>/render.log` is only written when `--log-file` is enabled.
 - Mermaid rendering errors fail the command instead of silently producing a broken diagram in the PDF.
 - Missing, empty, or invalid input directories fail with a clear error message.

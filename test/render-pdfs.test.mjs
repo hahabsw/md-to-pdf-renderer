@@ -55,6 +55,7 @@ test('prints help text', async () => {
     assert.equal(result.code, 0);
     assert.match(result.stdout, /Usage:/);
     assert.match(result.stdout, /--html <dir>/);
+    assert.match(result.stdout, /--manifest/);
     assert.match(result.stdout, /--input <path>/);
     assert.match(result.stdout, /Default: disabled/);
 });
@@ -70,7 +71,9 @@ test('parses CLI arguments for programmatic consumers', () => {
     const args = parseArgs([
         '--input', 'docs',
         '--output', 'out',
+        '--output-file', 'guide.pdf',
         '--html', 'out/html',
+        '--manifest',
         '--paper-size', 'Letter',
         '--orientation', 'landscape',
         '--chrome-path', '/usr/bin/chromium',
@@ -80,7 +83,9 @@ test('parses CLI arguments for programmatic consumers', () => {
     assert.deepEqual(args, {
         input: 'docs',
         output: 'out',
+        outputFile: 'guide.pdf',
         html: 'out/html',
+        manifest: true,
         paperSize: 'Letter',
         orientation: 'landscape',
         chromePath: '/usr/bin/chromium',
@@ -93,7 +98,7 @@ test('formats Error and non-Error values consistently', () => {
     assert.equal(formatError('plain failure'), 'plain failure');
 });
 
-test('renders PDFs without creating HTML files by default', { timeout: 120_000 }, async () => {
+test('renders PDFs without creating HTML files or a manifest by default', { timeout: 120_000 }, async () => {
     const tempDir = await createTempDir();
     const outputDir = path.join(tempDir, 'output');
 
@@ -103,23 +108,18 @@ test('renders PDFs without creating HTML files by default', { timeout: 120_000 }
         assert.equal(result.code, 0, result.stderr || result.stdout);
 
         const pdfPath = path.join(outputDir, 'rendering-showcase.pdf');
-        const manifestPath = path.join(outputDir, 'README.md');
         const htmlDirPath = path.join(outputDir, 'html');
 
         const pdfStat = await fs.stat(pdfPath);
         assert.ok(pdfStat.size > 0);
-
-        const manifest = await fs.readFile(manifestPath, 'utf8');
-        assert.match(manifest, /rendering-showcase\.pdf/);
-        assert.match(manifest, /# PDF 산출물 목록/);
-
+        await assert.rejects(fs.stat(path.join(outputDir, 'README.md')), { code: 'ENOENT' });
         await assert.rejects(fs.stat(htmlDirPath), { code: 'ENOENT' });
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
 });
 
-test('writes outputs to the current working directory when output is omitted', { timeout: 120_000 }, async () => {
+test('writes outputs to the current working directory without a manifest when output is omitted', { timeout: 120_000 }, async () => {
     const tempDir = await createTempDir();
 
     try {
@@ -135,14 +135,12 @@ test('writes outputs to the current working directory when output is omitted', {
         assert.equal(exitCode, 0);
 
         const pdfPath = path.join(tempDir, 'rendering-showcase.pdf');
-        const manifestPath = path.join(tempDir, 'README.md');
         const htmlDirPath = path.join(tempDir, 'html');
 
         const pdfStat = await fs.stat(pdfPath);
-        const manifest = await fs.readFile(manifestPath, 'utf8');
 
         assert.ok(pdfStat.size > 0);
-        assert.match(manifest, /rendering-showcase\.pdf/);
+        await assert.rejects(fs.stat(path.join(tempDir, 'README.md')), { code: 'ENOENT' });
         await assert.rejects(fs.stat(htmlDirPath), { code: 'ENOENT' });
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
@@ -159,12 +157,83 @@ test('renders a single Markdown file through the CLI', { timeout: 120_000 }, asy
         assert.equal(result.code, 0, result.stderr || result.stdout);
 
         const pdfPath = path.join(outputDir, 'rendering-showcase.pdf');
-        const manifest = await fs.readFile(path.join(outputDir, 'README.md'), 'utf8');
         const pdfStat = await fs.stat(pdfPath);
 
         assert.ok(pdfStat.size > 0);
-        assert.match(manifest, /rendering-showcase\.pdf/);
+        await assert.rejects(fs.stat(path.join(outputDir, 'README.md')), { code: 'ENOENT' });
         assert.match(result.stdout, /Discovered 1 markdown file\(s\)\./);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('uses a custom output PDF name for single-file CLI renders', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+    const outputDir = path.join(tempDir, 'output');
+
+    try {
+        const result = await runCli([
+            '--input',
+            fixtureInputFile,
+            '--output',
+            outputDir,
+            '--output-file',
+            'custom-guide.pdf',
+        ]);
+
+        assert.equal(result.code, 0, result.stderr || result.stdout);
+
+        const pdfPath = path.join(outputDir, 'custom-guide.pdf');
+        const pdfStat = await fs.stat(pdfPath);
+
+        assert.ok(pdfStat.size > 0);
+        await assert.rejects(fs.stat(path.join(outputDir, 'README.md')), { code: 'ENOENT' });
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('writes a custom single-file PDF into the current working directory when output is omitted', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const exitCode = await main(
+            ['--input', fixtureInputFile, '--output-file', 'guide-v2.pdf'],
+            {
+                cwd: tempDir,
+                stdout: { write: () => {} },
+                stderr: { write: () => {} },
+            },
+        );
+
+        assert.equal(exitCode, 0);
+
+        const pdfPath = path.join(tempDir, 'guide-v2.pdf');
+        const pdfStat = await fs.stat(pdfPath);
+
+        assert.ok(pdfStat.size > 0);
+        await assert.rejects(fs.stat(path.join(tempDir, 'README.md')), { code: 'ENOENT' });
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('writes a manifest only when requested through the CLI', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+    const outputDir = path.join(tempDir, 'output');
+
+    try {
+        const result = await runCli(['--input', fixtureInputDir, '--output', outputDir, '--manifest']);
+
+        assert.equal(result.code, 0, result.stderr || result.stdout);
+
+        const manifestPath = path.join(outputDir, 'README.md');
+        const manifest = await fs.readFile(manifestPath, 'utf8');
+
+        assert.match(manifest, /# PDF Outputs/);
+        assert.match(manifest, /Generated:/);
+        assert.match(manifest, /rendering-showcase\.pdf/);
+        assert.match(manifest, /source:/);
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
@@ -280,12 +349,31 @@ test('renders PDFs from a Markdown string through the library API', { timeout: 1
 
         const pdfStat = await fs.stat(result.file.pdfPath);
         const html = await fs.readFile(result.file.htmlPath, 'utf8');
-        const manifest = await fs.readFile(result.manifestPath, 'utf8');
-
         assert.ok(pdfStat.size > 0);
         assert.match(html, /<title>String Render<\/title>/);
         assert.match(html, /class="toc"/);
-        assert.match(manifest, /from-memory\.pdf/);
+        assert.equal(result.manifestPath, null);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('uses a custom output PDF name when rendering a Markdown string', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const result = await renderMarkdownString({
+            markdown: '# Named PDF',
+            fileName: 'source-name.md',
+            outputFileName: 'final-name.pdf',
+            outputDir: tempDir,
+            htmlDir: path.join(tempDir, 'html'),
+        });
+
+        assert.equal(result.file.fileName, 'source-name.md');
+        assert.equal(result.file.pdfName, 'final-name.pdf');
+        assert.ok(result.file.pdfPath.endsWith('final-name.pdf'));
+        assert.ok(result.file.htmlPath.endsWith('final-name.html'));
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
@@ -328,6 +416,7 @@ test('renders PDFs through the library API and returns output metadata', { timeo
             outputDir,
             htmlDir,
             logFile: true,
+            manifest: true,
             onProgress: (message) => {
                 messages.push(message);
             },
@@ -347,6 +436,7 @@ test('renders PDFs through the library API and returns output metadata', { timeo
 
         assert.ok(pdfStat.size > 0);
         assert.match(html, /<!doctype html>/i);
+        assert.match(manifest, /# PDF Outputs/);
         assert.match(manifest, /rendering-showcase\.pdf/);
         assert.match(log, /Render finished successfully\./);
         assert.ok(messages.some((message) => message.includes('Rendering rendering-showcase.md')));
@@ -370,12 +460,53 @@ test('renders a single Markdown file through the library API and returns file me
 
         assert.equal(result.inputFile, fixtureInputFile);
         assert.equal(result.outputDir, outputDir);
+        assert.equal(result.manifestPath, null);
         assert.equal(result.file.fileName, 'rendering-showcase.md');
         assert.ok(result.file.pdfPath.endsWith('rendering-showcase.pdf'));
         assert.ok(result.file.htmlPath.endsWith('rendering-showcase.html'));
 
         const pdfStat = await fs.stat(result.file.pdfPath);
         assert.ok(pdfStat.size > 0);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('uses a custom output PDF name when rendering a Markdown file', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const result = await renderMarkdownFile({
+            inputFile: fixtureInputFile,
+            outputDir: tempDir,
+            outputFileName: 'release-notes.pdf',
+            htmlDir: path.join(tempDir, 'html'),
+        });
+
+        assert.equal(result.file.fileName, 'rendering-showcase.md');
+        assert.equal(result.file.pdfName, 'release-notes.pdf');
+        assert.ok(result.file.pdfPath.endsWith('release-notes.pdf'));
+        assert.ok(result.file.htmlPath.endsWith('release-notes.html'));
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('writes a manifest when requested through the file API', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const result = await renderMarkdownFile({
+            inputFile: fixtureInputFile,
+            outputDir: tempDir,
+            manifest: true,
+        });
+
+        assert.ok(result.manifestPath);
+
+        const manifest = await fs.readFile(result.manifestPath, 'utf8');
+        assert.match(manifest, /# PDF Outputs/);
+        assert.match(manifest, /rendering-showcase\.pdf/);
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
@@ -404,6 +535,33 @@ test('auto-detects directory and file inputs through renderMarkdownPath', { time
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
+});
+
+test('uses a custom output PDF name through renderMarkdownPath for single-file input', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const result = await renderMarkdownPath({
+            input: fixtureInputFile,
+            output: tempDir,
+            outputFileName: 'path-based.pdf',
+        });
+
+        assert.equal(result.file.pdfName, 'path-based.pdf');
+        assert.ok(result.file.pdfPath.endsWith('path-based.pdf'));
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('rejects outputFileName for directory renders', async () => {
+    await assert.rejects(
+        renderMarkdownDirectory({
+            inputDir: fixtureInputDir,
+            outputFileName: 'not-allowed.pdf',
+        }),
+        /renderMarkdownDirectory does not support outputFileName\./,
+    );
 });
 
 test('runs the CLI entrypoint through main() with injected streams', async () => {

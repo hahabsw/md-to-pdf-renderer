@@ -17,7 +17,9 @@ Usage:
 Options:
   --input <path>         Source Markdown directory or file. Default: current working directory
   --output <dir>         PDF output directory. Default: current working directory
+  --output-file <name>   PDF file name for single-file input. Example: guide.pdf
   --html <dir>           Also write intermediate HTML files to this directory. Default: disabled
+  --manifest             Also write a README.md manifest file to the output directory. Default: disabled
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
   --log-file             Write progress logs to <output>/render.log
@@ -26,7 +28,11 @@ Options:
 
 Examples:
   md-to-pdf-renderer --output output
+  md-to-pdf-renderer --input docs/guide.md
   md-to-pdf-renderer --input docs/guide.md --output pdf
+  md-to-pdf-renderer --input docs/guide.md --output-file guide-v2.pdf
+  md-to-pdf-renderer --input docs --output pdf --manifest
+  md-to-pdf-renderer --input docs/guide.md --output pdf --output-file guide-v2.pdf
   md-to-pdf-renderer --input docs --output pdf --html pdf/html
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
@@ -43,7 +49,9 @@ Examples:
  *   help?: boolean,
  *   input?: string,
  *   output?: string,
+ *   outputFile?: string,
  *   html?: string,
+ *   manifest?: boolean,
  *   chromePath?: string,
  *   paperSize?: string,
  *   orientation?: string,
@@ -73,9 +81,20 @@ export function parseArgs(argv) {
             continue;
         }
 
+        if (arg === '--output-file') {
+            parsed.outputFile = argv[i + 1];
+            i += 1;
+            continue;
+        }
+
         if (arg === '--html') {
             parsed.html = argv[i + 1];
             i += 1;
+            continue;
+        }
+
+        if (arg === '--manifest') {
+            parsed.manifest = true;
             continue;
         }
 
@@ -134,7 +153,9 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
             cwd,
             input: args.input,
             output: args.output,
+            outputFile: args.outputFile,
             html: args.html,
+            manifest: args.manifest,
             paperSize: args.paperSize,
             orientation: args.orientation,
             logFile: args.logFile,

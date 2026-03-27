@@ -30,7 +30,7 @@ import {
  * @property {string} inputDir Absolute input directory path.
  * @property {string} outputDir Absolute output directory path.
  * @property {string | null} htmlDir Absolute HTML output directory path when enabled.
- * @property {string} manifestPath Absolute path to the generated output manifest.
+ * @property {string | null} manifestPath Absolute path to the generated output manifest when enabled.
  * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
  * @property {RenderedFile[]} files Rendered output metadata for each Markdown file.
  */
@@ -40,7 +40,7 @@ import {
  * @property {string} inputFile Absolute input file path.
  * @property {string} outputDir Absolute output directory path.
  * @property {string | null} htmlDir Absolute HTML output directory path when enabled.
- * @property {string} manifestPath Absolute path to the generated output manifest.
+ * @property {string | null} manifestPath Absolute path to the generated output manifest when enabled.
  * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
  * @property {RenderedFile} file Rendered output metadata for the Markdown file.
  */
@@ -50,7 +50,7 @@ import {
  * @property {string} fileName Virtual source file name used for output naming and manifest entries.
  * @property {string} outputDir Absolute output directory path.
  * @property {string | null} htmlDir Absolute HTML output directory path when enabled.
- * @property {string} manifestPath Absolute path to the generated output manifest.
+ * @property {string | null} manifestPath Absolute path to the generated output manifest when enabled.
  * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
  * @property {RenderedFile} file Rendered output metadata for the Markdown content.
  */
@@ -59,7 +59,7 @@ import {
  * Render every top-level Markdown file in a directory into PDF files.
  *
  * Paths may be absolute or relative to `cwd`. By default the renderer writes
- * PDFs and a manifest into the current working directory, skips intermediate HTML files, and logs
+ * PDFs into the current working directory, skips intermediate HTML files and manifests by default, and logs
  * progress through `onProgress` only.
  *
  * @param {Object} [options={}]
@@ -70,6 +70,8 @@ import {
  * @param {string} [options.output] Alias for `outputDir`.
  * @param {string | null} [options.htmlDir]
  * @param {string | null} [options.html] Alias for `htmlDir`.
+ * @param {boolean} [options.writeManifest=false]
+ * @param {boolean} [options.manifest=false] Alias for `writeManifest`.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
  * @param {boolean} [options.logToFile=false]
@@ -79,6 +81,7 @@ import {
  * @returns {Promise<RenderDirectoryResult>}
  */
 export async function renderMarkdownDirectory(options = {}) {
+    assertNoOutputFileName(options, 'renderMarkdownDirectory');
     const renderOptions = resolveRenderOptions(options);
     const files = await getMarkdownFiles(renderOptions.inputDir);
 
@@ -106,8 +109,7 @@ export async function renderMarkdownDirectory(options = {}) {
  * Render a single Markdown file into PDF output.
  *
  * Paths may be absolute or relative to `cwd`. The PDF file is written into
- * `outputDir` using the Markdown file name, and a one-item manifest is still
- * generated for consistency with directory renders.
+ * `outputDir` using the Markdown file name. Manifest output is optional.
  *
  * @param {Object} [options={}]
  * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
@@ -115,8 +117,12 @@ export async function renderMarkdownDirectory(options = {}) {
  * @param {string} [options.input] Alias for `inputFile`.
  * @param {string} [options.outputDir] Output directory. Defaults to the current working directory.
  * @param {string} [options.output] Alias for `outputDir`.
+ * @param {string} [options.outputFileName] Optional PDF file name for the rendered output.
+ * @param {string} [options.outputFile] Alias for `outputFileName`.
  * @param {string | null} [options.htmlDir]
  * @param {string | null} [options.html] Alias for `htmlDir`.
+ * @param {boolean} [options.writeManifest=false]
+ * @param {boolean} [options.manifest=false] Alias for `writeManifest`.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
  * @param {boolean} [options.logToFile=false]
@@ -135,6 +141,7 @@ export async function renderMarkdownFile(options = {}) {
         sourceEntries: [{
             fileName: path.basename(sourceFile),
             sourcePath: sourceFile,
+            outputFileName: renderOptions.outputFileName,
         }],
         baseHref: toDirectoryHref(path.dirname(sourceFile)),
         discoveredMessage: `Discovered 1 markdown file(s).`,
@@ -153,7 +160,7 @@ export async function renderMarkdownFile(options = {}) {
  * Render Markdown content supplied as a string into PDF output.
  *
  * This API is useful when Markdown comes from memory rather than from a file.
- * A virtual `fileName` is used to derive output file names and manifest entries.
+ * A virtual `fileName` is used to derive output file names and optional manifest entries.
  *
  * @param {Object} options
  * @param {string} options.markdown Markdown source to render.
@@ -166,8 +173,12 @@ export async function renderMarkdownFile(options = {}) {
  * @param {string} [options.baseHref] Explicit `<base href>` value for generated HTML.
  * @param {string} [options.outputDir] Output directory. Defaults to the current working directory.
  * @param {string} [options.output] Alias for `outputDir`.
+ * @param {string} [options.outputFileName] Optional PDF file name for the rendered output.
+ * @param {string} [options.outputFile] Alias for `outputFileName`.
  * @param {string | null} [options.htmlDir]
  * @param {string | null} [options.html] Alias for `htmlDir`.
+ * @param {boolean} [options.writeManifest=false]
+ * @param {boolean} [options.manifest=false] Alias for `writeManifest`.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
  * @param {boolean} [options.logToFile=false]
@@ -187,6 +198,7 @@ export async function renderMarkdownString(options = {}) {
             sourcePath: null,
             markdown: renderOptions.markdown,
             title: renderOptions.title,
+            outputFileName: renderOptions.outputFileName,
         }],
         baseHref: renderOptions.baseHref,
         discoveredMessage: 'Discovered 1 markdown file(s).',
@@ -210,6 +222,10 @@ export async function renderMarkdownString(options = {}) {
  * @param {Object} [options={}]
  * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
  * @param {string} [options.input='.'] Directory or Markdown file path.
+ * @param {string} [options.outputFileName] Optional PDF file name when `input` resolves to a single Markdown file.
+ * @param {string} [options.outputFile] Alias for `outputFileName`.
+ * @param {boolean} [options.writeManifest=false]
+ * @param {boolean} [options.manifest=false] Alias for `writeManifest`.
  * @returns {Promise<RenderDirectoryResult | RenderFileResult>}
  */
 export async function renderMarkdownPath(options = {}) {
@@ -271,6 +287,12 @@ export function formatError(error) {
     }
 
     return String(error);
+}
+
+function assertNoOutputFileName(options, apiName) {
+    if (options.outputFileName != null || options.outputFile != null) {
+        throw new Error(`${apiName} does not support outputFileName. Use renderMarkdownFile, renderMarkdownString, or renderMarkdownPath with a single Markdown file.`);
+    }
 }
 
 function createLogger({ logToFile, renderLogPath, onProgress }) {
@@ -342,9 +364,11 @@ async function renderMarkdownSources({
                 baseHref,
                 paperLayout: renderOptions.paperLayout,
             });
-            const baseName = fileName.replace(/\.md$/i, '');
-            const pdfPath = path.join(renderOptions.outputDir, `${baseName}.pdf`);
-            const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, `${baseName}.html`) : null;
+            const defaultBaseName = fileName.replace(/\.md$/i, '');
+            const pdfName = entry.outputFileName ?? `${defaultBaseName}.pdf`;
+            const htmlName = `${pdfName.replace(/\.pdf$/i, '')}.html`;
+            const pdfPath = path.join(renderOptions.outputDir, pdfName);
+            const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, htmlName) : null;
 
             await logProgress(`[${index + 1}/${sourceEntries.length}] Rendering ${fileName}`);
             if (htmlPath) {
@@ -355,12 +379,12 @@ async function renderMarkdownSources({
                 pdfPath,
                 documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
             });
-            await logProgress(`[${index + 1}/${sourceEntries.length}] Completed ${fileName} -> ${baseName}.pdf`);
+            await logProgress(`[${index + 1}/${sourceEntries.length}] Completed ${fileName} -> ${pdfName}`);
 
             renderedFiles.push({
                 title,
                 fileName,
-                pdfName: `${baseName}.pdf`,
+                pdfName,
                 pdfPath,
                 htmlPath,
                 sourcePath,
@@ -369,9 +393,13 @@ async function renderMarkdownSources({
 
         await logProgress(`Rendered ${renderedFiles.length} PDF file(s).`);
 
-        const manifestPath = path.join(renderOptions.outputDir, 'README.md');
-        await fs.writeFile(manifestPath, buildManifestMarkdown(renderedFiles), 'utf8');
-        await logProgress(`Wrote manifest: ${manifestPath}`);
+        const manifestPath = renderOptions.writeManifest ? renderOptions.manifestPath : null;
+
+        if (manifestPath) {
+            await fs.writeFile(manifestPath, buildManifestMarkdown(renderedFiles), 'utf8');
+            await logProgress(`Wrote manifest: ${manifestPath}`);
+        }
+
         await logProgress('Render finished successfully.');
 
         return buildResult({
