@@ -88,18 +88,14 @@ export async function renderMarkdownDirectory(options = {}) {
     return renderMarkdownSources({
         renderOptions,
         inputLabel: renderOptions.inputDir,
-        sourceEntries: files.map((fileName) => ({
+        sourceEntries: files.map((fileName) => createSourceEntry({
             fileName,
             sourcePath: path.join(renderOptions.inputDir, fileName),
         })),
         baseHref: toDirectoryHref(renderOptions.inputDir),
-        discoveredMessage: `Discovered ${files.length} markdown file(s).`,
         buildResult: ({ manifestPath, files: renderedFiles }) => ({
+            ...createResultMeta(renderOptions, manifestPath),
             inputDir: renderOptions.inputDir,
-            outputDir: renderOptions.outputDir,
-            htmlDir: renderOptions.htmlDir,
-            manifestPath,
-            renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
             files: renderedFiles,
         }),
     });
@@ -138,19 +134,15 @@ export async function renderMarkdownFile(options = {}) {
     return renderMarkdownSources({
         renderOptions,
         inputLabel: renderOptions.inputFile,
-        sourceEntries: [{
+        sourceEntries: [createSourceEntry({
             fileName: path.basename(sourceFile),
             sourcePath: sourceFile,
             outputFileName: renderOptions.outputFileName,
-        }],
+        })],
         baseHref: toDirectoryHref(path.dirname(sourceFile)),
-        discoveredMessage: `Discovered 1 markdown file(s).`,
         buildResult: ({ manifestPath, files: renderedFiles }) => ({
+            ...createResultMeta(renderOptions, manifestPath),
             inputFile: renderOptions.inputFile,
-            outputDir: renderOptions.outputDir,
-            htmlDir: renderOptions.htmlDir,
-            manifestPath,
-            renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
             file: renderedFiles[0],
         }),
     });
@@ -193,21 +185,17 @@ export async function renderMarkdownString(options = {}) {
     return renderMarkdownSources({
         renderOptions,
         inputLabel: '[markdown string]',
-        sourceEntries: [{
+        sourceEntries: [createSourceEntry({
             fileName: renderOptions.fileName,
             sourcePath: null,
             markdown: renderOptions.markdown,
             title: renderOptions.title,
             outputFileName: renderOptions.outputFileName,
-        }],
+        })],
         baseHref: renderOptions.baseHref,
-        discoveredMessage: 'Discovered 1 markdown file(s).',
         buildResult: ({ manifestPath, files: renderedFiles }) => ({
+            ...createResultMeta(renderOptions, manifestPath),
             fileName: renderOptions.fileName,
-            outputDir: renderOptions.outputDir,
-            htmlDir: renderOptions.htmlDir,
-            manifestPath,
-            renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
             file: renderedFiles[0],
         }),
     });
@@ -312,20 +300,11 @@ async function renderMarkdownSources({
     inputLabel,
     sourceEntries,
     baseHref,
-    discoveredMessage,
     buildResult,
 }) {
     const logProgress = createLogger(renderOptions);
 
-    await fs.mkdir(renderOptions.outputDir, { recursive: true });
-
-    if (renderOptions.htmlDir) {
-        await fs.mkdir(renderOptions.htmlDir, { recursive: true });
-    }
-
-    if (renderOptions.logToFile) {
-        await fs.writeFile(renderOptions.renderLogPath, '', 'utf8');
-    }
+    await prepareOutputDirectories(renderOptions);
 
     await logProgress(
         `Render started.
@@ -347,48 +326,20 @@ async function renderMarkdownSources({
             headless: true,
         });
 
-        await logProgress(discoveredMessage);
+        await logProgress(`Discovered ${sourceEntries.length} markdown file(s).`);
 
         const renderedFiles = [];
 
         for (const [index, entry] of sourceEntries.entries()) {
-            const fileName = entry.fileName;
-            const sourcePath = entry.sourcePath ?? null;
-            const markdown = typeof entry.markdown === 'string'
-                ? entry.markdown
-                : await fs.readFile(sourcePath, 'utf8');
-            const title = entry.title ?? extractTitle(markdown) ?? toTitle(fileName);
-            const html = await renderMarkdownDocument({
-                markdown,
-                title,
+            renderedFiles.push(await renderSourceEntry({
+                browser,
+                entry,
                 baseHref,
-                paperLayout: renderOptions.paperLayout,
-            });
-            const defaultBaseName = fileName.replace(/\.md$/i, '');
-            const pdfName = entry.outputFileName ?? `${defaultBaseName}.pdf`;
-            const htmlName = `${pdfName.replace(/\.pdf$/i, '')}.html`;
-            const pdfPath = path.join(renderOptions.outputDir, pdfName);
-            const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, htmlName) : null;
-
-            await logProgress(`[${index + 1}/${sourceEntries.length}] Rendering ${fileName}`);
-            if (htmlPath) {
-                await fs.writeFile(htmlPath, html, 'utf8');
-            }
-            await renderPdf(browser, {
-                html,
-                pdfPath,
-                documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
-            });
-            await logProgress(`[${index + 1}/${sourceEntries.length}] Completed ${fileName} -> ${pdfName}`);
-
-            renderedFiles.push({
-                title,
-                fileName,
-                pdfName,
-                pdfPath,
-                htmlPath,
-                sourcePath,
-            });
+                renderOptions,
+                logProgress,
+                index,
+                totalEntries: sourceEntries.length,
+            }));
         }
 
         await logProgress(`Rendered ${renderedFiles.length} PDF file(s).`);
@@ -414,6 +365,104 @@ async function renderMarkdownSources({
             await browser.close();
         }
     }
+}
+
+function createSourceEntry({
+    fileName,
+    sourcePath = null,
+    markdown,
+    title,
+    outputFileName,
+}) {
+    return {
+        fileName,
+        sourcePath,
+        markdown,
+        title,
+        outputFileName,
+    };
+}
+
+function createResultMeta(renderOptions, manifestPath) {
+    return {
+        outputDir: renderOptions.outputDir,
+        htmlDir: renderOptions.htmlDir,
+        manifestPath,
+        renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
+    };
+}
+
+async function prepareOutputDirectories(renderOptions) {
+    await fs.mkdir(renderOptions.outputDir, { recursive: true });
+
+    if (renderOptions.htmlDir) {
+        await fs.mkdir(renderOptions.htmlDir, { recursive: true });
+    }
+
+    if (renderOptions.logToFile) {
+        await fs.writeFile(renderOptions.renderLogPath, '', 'utf8');
+    }
+}
+
+async function renderSourceEntry({
+    browser,
+    entry,
+    baseHref,
+    renderOptions,
+    logProgress,
+    index,
+    totalEntries,
+}) {
+    const fileName = entry.fileName;
+    const sourcePath = entry.sourcePath ?? null;
+    const markdown = typeof entry.markdown === 'string'
+        ? entry.markdown
+        : await fs.readFile(sourcePath, 'utf8');
+    const title = entry.title ?? extractTitle(markdown) ?? toTitle(fileName);
+    const outputPaths = buildOutputPaths(renderOptions, fileName, entry.outputFileName);
+    const html = await renderMarkdownDocument({
+        markdown,
+        title,
+        baseHref,
+        paperLayout: renderOptions.paperLayout,
+    });
+
+    await logProgress(`[${index + 1}/${totalEntries}] Rendering ${fileName}`);
+
+    if (outputPaths.htmlPath) {
+        await fs.writeFile(outputPaths.htmlPath, html, 'utf8');
+    }
+
+    await renderPdf(browser, {
+        html,
+        pdfPath: outputPaths.pdfPath,
+        documentLabel: outputPaths.documentLabel,
+    });
+
+    await logProgress(`[${index + 1}/${totalEntries}] Completed ${fileName} -> ${outputPaths.pdfName}`);
+
+    return {
+        title,
+        fileName,
+        pdfName: outputPaths.pdfName,
+        pdfPath: outputPaths.pdfPath,
+        htmlPath: outputPaths.htmlPath,
+        sourcePath,
+    };
+}
+
+function buildOutputPaths(renderOptions, fileName, outputFileName) {
+    const defaultBaseName = fileName.replace(/\.md$/i, '');
+    const pdfName = outputFileName ?? `${defaultBaseName}.pdf`;
+    const htmlName = `${pdfName.replace(/\.pdf$/i, '')}.html`;
+    const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, htmlName) : null;
+
+    return {
+        pdfName,
+        pdfPath: path.join(renderOptions.outputDir, pdfName),
+        htmlPath,
+        documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
+    };
 }
 
 async function statInputPath(inputPath) {

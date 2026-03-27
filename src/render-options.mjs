@@ -7,56 +7,23 @@ import {
 } from './markdown-document.mjs';
 
 export function resolveRenderOptions(options = {}) {
-    const cwd = path.resolve(options.cwd ?? process.cwd());
-    const inputDir = path.resolve(cwd, options.inputDir ?? options.input ?? '.');
-    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? '.');
-    const htmlTarget = options.htmlDir ?? options.html ?? null;
-    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
-    const logToFile = Boolean(options.logToFile ?? options.logFile);
-    const writeManifest = Boolean(options.writeManifest ?? options.manifest);
-    const paperOrientation = resolvePaperOrientation(options.orientation);
-    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+    const cwd = resolveCwd(options);
+    const renderRuntime = resolveRenderRuntimeOptions(options, cwd);
 
     return {
-        inputDir,
-        outputDir,
-        htmlDir,
-        chromePath: options.chromePath ?? null,
-        logToFile,
-        writeManifest,
-        manifestPath: path.join(outputDir, 'README.md'),
-        renderLogPath: path.join(outputDir, 'render.log'),
-        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
-        paperOrientation,
-        paperLayout,
+        inputDir: resolvePathOption(cwd, options.inputDir ?? options.input ?? '.'),
+        ...renderRuntime,
     };
 }
 
 export function resolveFileRenderOptions(options = {}) {
-    const cwd = path.resolve(options.cwd ?? process.cwd());
-    const inputFile = path.resolve(cwd, options.inputFile ?? options.input ?? '.');
-    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? '.');
-    const htmlTarget = options.htmlDir ?? options.html ?? null;
-    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
-    const logToFile = Boolean(options.logToFile ?? options.logFile);
-    const writeManifest = Boolean(options.writeManifest ?? options.manifest);
-    const paperOrientation = resolvePaperOrientation(options.orientation);
-    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
-    const outputFileName = normalizePdfFileName(options.outputFileName ?? options.outputFile ?? null);
+    const cwd = resolveCwd(options);
+    const renderRuntime = resolveRenderRuntimeOptions(options, cwd);
 
     return {
-        inputFile,
-        outputDir,
-        outputFileName,
-        htmlDir,
-        chromePath: options.chromePath ?? null,
-        logToFile,
-        writeManifest,
-        manifestPath: path.join(outputDir, 'README.md'),
-        renderLogPath: path.join(outputDir, 'render.log'),
-        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
-        paperOrientation,
-        paperLayout,
+        inputFile: resolvePathOption(cwd, options.inputFile ?? options.input ?? '.'),
+        outputFileName: normalizePdfFileName(options.outputFileName ?? options.outputFile ?? null),
+        ...renderRuntime,
     };
 }
 
@@ -65,16 +32,14 @@ export function resolveDocumentRenderOptions(options = {}) {
         throw new Error('renderMarkdownToHtml requires a markdown string.');
     }
 
-    const cwd = path.resolve(options.cwd ?? process.cwd());
-    const baseDir = path.resolve(cwd, options.baseDir ?? options.inputDir ?? '.');
+    const cwd = resolveCwd(options);
     const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
-    const paperOrientation = resolvePaperOrientation(options.orientation);
-    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+    const paperLayout = resolvePaperLayout(options.paperSize, resolvePaperOrientation(options.orientation));
 
     return {
         markdown: options.markdown,
         title,
-        baseHref: options.baseHref ?? toDirectoryHref(baseDir),
+        baseHref: options.baseHref ?? toDirectoryHref(resolvePathOption(cwd, options.baseDir ?? options.inputDir ?? '.')),
         paperLayout,
     };
 }
@@ -84,35 +49,16 @@ export function resolveStringRenderOptions(options = {}) {
         throw new Error('renderMarkdownString requires a markdown string.');
     }
 
-    const cwd = path.resolve(options.cwd ?? process.cwd());
-    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? '.');
-    const htmlTarget = options.htmlDir ?? options.html ?? null;
-    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
-    const logToFile = Boolean(options.logToFile ?? options.logFile);
-    const writeManifest = Boolean(options.writeManifest ?? options.manifest);
-    const paperOrientation = resolvePaperOrientation(options.orientation);
-    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
-    const baseDir = path.resolve(cwd, options.baseDir ?? options.inputDir ?? '.');
-    const fileName = normalizeMarkdownFileName(options.fileName ?? options.name ?? 'document.md');
-    const outputFileName = normalizePdfFileName(options.outputFileName ?? options.outputFile ?? null);
-    const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
+    const cwd = resolveCwd(options);
+    const renderRuntime = resolveRenderRuntimeOptions(options, cwd);
 
     return {
         markdown: options.markdown,
-        fileName,
-        title,
-        outputDir,
-        outputFileName,
-        htmlDir,
-        chromePath: options.chromePath ?? null,
-        logToFile,
-        writeManifest,
-        manifestPath: path.join(outputDir, 'README.md'),
-        renderLogPath: path.join(outputDir, 'render.log'),
-        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
-        paperOrientation,
-        paperLayout,
-        baseHref: options.baseHref ?? toDirectoryHref(baseDir),
+        fileName: normalizeMarkdownFileName(options.fileName ?? options.name ?? 'document.md'),
+        title: options.title?.trim() || extractTitle(options.markdown) || 'Document',
+        outputFileName: normalizePdfFileName(options.outputFileName ?? options.outputFile ?? null),
+        baseHref: options.baseHref ?? toDirectoryHref(resolvePathOption(cwd, options.baseDir ?? options.inputDir ?? '.')),
+        ...renderRuntime,
     };
 }
 
@@ -144,3 +90,36 @@ function normalizePdfFileName(value) {
 
     return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
 }
+
+function resolveCwd(options) {
+    return path.resolve(options.cwd ?? process.cwd());
+}
+
+function resolveRenderRuntimeOptions(options, cwd) {
+    const outputDir = resolvePathOption(cwd, options.outputDir ?? options.output ?? '.');
+    const htmlDir = resolveOptionalPathOption(cwd, options.htmlDir ?? options.html ?? null);
+    const paperOrientation = resolvePaperOrientation(options.orientation);
+
+    return {
+        outputDir,
+        htmlDir,
+        chromePath: options.chromePath ?? null,
+        logToFile: Boolean(options.logToFile ?? options.logFile),
+        writeManifest: Boolean(options.writeManifest ?? options.manifest),
+        manifestPath: path.join(outputDir, 'README.md'),
+        renderLogPath: path.join(outputDir, 'render.log'),
+        onProgress: typeof options.onProgress === 'function' ? options.onProgress : noopProgress,
+        paperOrientation,
+        paperLayout: resolvePaperLayout(options.paperSize, paperOrientation),
+    };
+}
+
+function resolvePathOption(cwd, value) {
+    return path.resolve(cwd, value);
+}
+
+function resolveOptionalPathOption(cwd, value) {
+    return value ? resolvePathOption(cwd, value) : null;
+}
+
+async function noopProgress() {}
