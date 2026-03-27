@@ -30,7 +30,7 @@ Expected output:
 Tool contract:
 
 - Input is the top-level `*.md` files in the `--input` directory.
-- Output is `*.pdf` and a manifest `README.md` in `--output`.
+- Output is `*.pdf` and a manifest `README.md` in `--output`, or in the current working directory when `--output` is omitted.
 - Intermediate HTML files are only written when `--html <dir>` is provided.
 - For automation, prefer passing both `--input` and `--output` explicitly instead of relying on defaults.
 - The command exits with a non-zero status when the input directory is missing, empty, or when Mermaid rendering fails.
@@ -96,6 +96,8 @@ Quick start with `npx`:
 ```bash
 npx md-to-pdf-renderer
 ```
+
+This writes output files into the current working directory by default.
 
 Single file:
 
@@ -176,7 +178,7 @@ Available exports:
 | ---- | ---- | ---- | ---- |
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `inputDir` / `input` | `string` | `.` | Directory containing top-level `*.md` files |
-| `outputDir` / `output` | `string` | `output` | Directory where PDFs and manifest are written |
+| `outputDir` / `output` | `string` | `.` | Directory where PDFs and manifest are written |
 | `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML files are also written |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
@@ -201,7 +203,7 @@ Available exports:
 | ---- | ---- | ---- | ---- |
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `inputFile` / `input` | `string` | Required | Markdown file to render |
-| `outputDir` / `output` | `string` | `output` | Directory where PDF and manifest are written |
+| `outputDir` / `output` | `string` | `.` | Directory where PDF and manifest are written |
 | `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML file is also written |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
@@ -248,7 +250,7 @@ Available exports:
 | Option | Description | Default |
 | ---- | ---- | ---- |
 | `--input` | Directory or Markdown file to render | Current working directory |
-| `--output` | Directory where PDF files are written | `output` |
+| `--output` | Directory where PDF files are written | Current working directory |
 | `--html` | Also write intermediate HTML files to this directory | Disabled |
 | `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
 | `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |

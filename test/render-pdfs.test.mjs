@@ -118,6 +118,36 @@ test('renders PDFs without creating HTML files by default', { timeout: 120_000 }
     }
 });
 
+test('writes outputs to the current working directory when output is omitted', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const exitCode = await main(
+            ['--input', fixtureInputFile],
+            {
+                cwd: tempDir,
+                stdout: { write: () => {} },
+                stderr: { write: () => {} },
+            },
+        );
+
+        assert.equal(exitCode, 0);
+
+        const pdfPath = path.join(tempDir, 'rendering-showcase.pdf');
+        const manifestPath = path.join(tempDir, 'README.md');
+        const htmlDirPath = path.join(tempDir, 'html');
+
+        const pdfStat = await fs.stat(pdfPath);
+        const manifest = await fs.readFile(manifestPath, 'utf8');
+
+        assert.ok(pdfStat.size > 0);
+        assert.match(manifest, /rendering-showcase\.pdf/);
+        await assert.rejects(fs.stat(htmlDirPath), { code: 'ENOENT' });
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
 test('renders a single Markdown file through the CLI', { timeout: 120_000 }, async () => {
     const tempDir = await createTempDir();
     const outputDir = path.join(tempDir, 'output');

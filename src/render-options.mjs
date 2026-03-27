@@ -9,7 +9,7 @@ import {
 export function resolveRenderOptions(options = {}) {
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const inputDir = path.resolve(cwd, options.inputDir ?? options.input ?? '.');
-    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? 'output');
+    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? '.');
     const htmlTarget = options.htmlDir ?? options.html ?? null;
     const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
     const logToFile = Boolean(options.logToFile ?? options.logFile);
@@ -32,7 +32,7 @@ export function resolveRenderOptions(options = {}) {
 export function resolveFileRenderOptions(options = {}) {
     const cwd = path.resolve(options.cwd ?? process.cwd());
     const inputFile = path.resolve(cwd, options.inputFile ?? options.input ?? '.');
-    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? 'output');
+    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? '.');
     const htmlTarget = options.htmlDir ?? options.html ?? null;
     const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
     const logToFile = Boolean(options.logToFile ?? options.logFile);

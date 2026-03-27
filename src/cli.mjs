@@ -16,7 +16,7 @@ Usage:
 
 Options:
   --input <path>         Source Markdown directory or file. Default: current working directory
-  --output <dir>         PDF output directory. Default: output
+  --output <dir>         PDF output directory. Default: current working directory
   --html <dir>           Also write intermediate HTML files to this directory. Default: disabled
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait

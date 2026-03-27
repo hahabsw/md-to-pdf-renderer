@@ -48,14 +48,14 @@ import {
  * Render every top-level Markdown file in a directory into PDF files.
  *
  * Paths may be absolute or relative to `cwd`. By default the renderer writes
- * PDFs and a manifest into `output`, skips intermediate HTML files, and logs
+ * PDFs and a manifest into the current working directory, skips intermediate HTML files, and logs
  * progress through `onProgress` only.
  *
  * @param {Object} [options={}]
  * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
  * @param {string} [options.inputDir]
  * @param {string} [options.input] Alias for `inputDir`.
- * @param {string} [options.outputDir]
+ * @param {string} [options.outputDir] Output directory. Defaults to the current working directory.
  * @param {string} [options.output] Alias for `outputDir`.
  * @param {string | null} [options.htmlDir]
  * @param {string | null} [options.html] Alias for `htmlDir`.
@@ -99,7 +99,7 @@ export async function renderMarkdownDirectory(options = {}) {
  * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
  * @param {string} [options.inputFile]
  * @param {string} [options.input] Alias for `inputFile`.
- * @param {string} [options.outputDir]
+ * @param {string} [options.outputDir] Output directory. Defaults to the current working directory.
  * @param {string} [options.output] Alias for `outputDir`.
  * @param {string | null} [options.htmlDir]
  * @param {string | null} [options.html] Alias for `htmlDir`.
