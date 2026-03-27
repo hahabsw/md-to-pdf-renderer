@@ -13,6 +13,7 @@ import {
     renderMarkdownDirectory,
     renderMarkdownFile,
     renderMarkdownPath,
+    renderMarkdownString,
     renderMarkdownToHtml,
 } from '../src/render-pdfs.mjs';
 
@@ -245,6 +246,72 @@ test('rejects invalid programmatic HTML render input', async () => {
     await assert.rejects(
         renderMarkdownToHtml({ title: 'Missing Markdown' }),
         /renderMarkdownToHtml requires a markdown string\./,
+    );
+});
+
+test('renders PDFs from a Markdown string through the library API', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+    const outputDir = path.join(tempDir, 'output');
+    const htmlDir = path.join(outputDir, 'html');
+    const markdown = [
+        '# String Render',
+        '',
+        '[[TOC]]',
+        '',
+        '## Content',
+        '',
+        'Inline math: $E = mc^2$.',
+    ].join('\n');
+
+    try {
+        const result = await renderMarkdownString({
+            markdown,
+            fileName: 'from-memory.md',
+            outputDir,
+            htmlDir,
+            baseDir: fixtureInputDir,
+        });
+
+        assert.equal(result.fileName, 'from-memory.md');
+        assert.equal(result.file.fileName, 'from-memory.md');
+        assert.equal(result.file.sourcePath, null);
+        assert.ok(result.file.pdfPath.endsWith('from-memory.pdf'));
+        assert.ok(result.file.htmlPath.endsWith('from-memory.html'));
+
+        const pdfStat = await fs.stat(result.file.pdfPath);
+        const html = await fs.readFile(result.file.htmlPath, 'utf8');
+        const manifest = await fs.readFile(result.manifestPath, 'utf8');
+
+        assert.ok(pdfStat.size > 0);
+        assert.match(html, /<title>String Render<\/title>/);
+        assert.match(html, /class="toc"/);
+        assert.match(manifest, /from-memory\.pdf/);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('uses a default virtual file name when rendering a Markdown string', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+
+    try {
+        const result = await renderMarkdownString({
+            markdown: '# Untitled In Memory',
+            outputDir: tempDir,
+        });
+
+        assert.equal(result.fileName, 'document.md');
+        assert.equal(result.file.fileName, 'document.md');
+        assert.ok(result.file.pdfPath.endsWith('document.pdf'));
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('rejects invalid programmatic PDF render input for Markdown strings', async () => {
+    await assert.rejects(
+        renderMarkdownString({ title: 'Missing Markdown' }),
+        /renderMarkdownString requires a markdown string\./,
     );
 });
 

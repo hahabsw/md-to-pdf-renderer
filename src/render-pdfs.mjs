@@ -8,6 +8,7 @@ export {
     renderMarkdownDirectory,
     renderMarkdownFile,
     renderMarkdownPath,
+    renderMarkdownString,
     renderMarkdownToHtml,
 } from './render-engine.mjs';
 

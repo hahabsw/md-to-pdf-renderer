@@ -71,7 +71,49 @@ export function resolveDocumentRenderOptions(options = {}) {
     };
 }
 
+export function resolveStringRenderOptions(options = {}) {
+    if (typeof options.markdown !== 'string') {
+        throw new Error('renderMarkdownString requires a markdown string.');
+    }
+
+    const cwd = path.resolve(options.cwd ?? process.cwd());
+    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? '.');
+    const htmlTarget = options.htmlDir ?? options.html ?? null;
+    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
+    const logToFile = Boolean(options.logToFile ?? options.logFile);
+    const paperOrientation = resolvePaperOrientation(options.orientation);
+    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+    const baseDir = path.resolve(cwd, options.baseDir ?? options.inputDir ?? '.');
+    const fileName = normalizeMarkdownFileName(options.fileName ?? options.name ?? 'document.md');
+    const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
+
+    return {
+        markdown: options.markdown,
+        fileName,
+        title,
+        outputDir,
+        htmlDir,
+        chromePath: options.chromePath ?? null,
+        logToFile,
+        renderLogPath: path.join(outputDir, 'render.log'),
+        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
+        paperOrientation,
+        paperLayout,
+        baseHref: options.baseHref ?? toDirectoryHref(baseDir),
+    };
+}
+
 export function toDirectoryHref(directoryPath) {
     const href = pathToFileURL(directoryPath).href;
     return href.endsWith('/') ? href : `${href}/`;
+}
+
+function normalizeMarkdownFileName(value) {
+    const trimmed = String(value).trim();
+
+    if (!trimmed) {
+        return 'document.md';
+    }
+
+    return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
 }
