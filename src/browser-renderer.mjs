@@ -1,6 +1,12 @@
 import fs from 'node:fs/promises';
+import puppeteer from 'puppeteer';
 
 export async function renderPdf(browser, { html, pdfPath, documentLabel }) {
+    const pdf = await renderPdfBuffer(browser, { html, documentLabel });
+    await fs.writeFile(pdfPath, pdf);
+}
+
+export async function renderPdfBuffer(browser, { html, documentLabel, waitForReadySignal = true }) {
     const page = await browser.newPage();
 
     try {
@@ -8,16 +14,19 @@ export async function renderPdf(browser, { html, pdfPath, documentLabel }) {
             waitUntil: 'networkidle0',
         });
         await page.emulateMediaType('print');
-        await page.waitForFunction(
-            () => document.body.dataset.mermaidReady === 'true' || Boolean(document.body.dataset.mermaidError),
-            {
-                timeout: 30_000,
-            },
-        );
-        const mermaidError = await page.evaluate(() => document.body.dataset.mermaidError || null);
 
-        if (mermaidError) {
-            throw new Error(`Mermaid render failed for ${documentLabel}: ${mermaidError}`);
+        if (waitForReadySignal) {
+            await page.waitForFunction(
+                () => document.body.dataset.mermaidReady === 'true' || Boolean(document.body.dataset.mermaidError),
+                {
+                    timeout: 30_000,
+                },
+            );
+            const mermaidError = await page.evaluate(() => document.body.dataset.mermaidError || null);
+
+            if (mermaidError) {
+                throw new Error(`Mermaid render failed for ${documentLabel}: ${mermaidError}`);
+            }
         }
 
         await page.evaluate(async () => {
@@ -25,14 +34,27 @@ export async function renderPdf(browser, { html, pdfPath, documentLabel }) {
                 await document.fonts.ready;
             }
         });
-        await page.pdf({
-            path: pdfPath,
+        return await page.pdf({
             printBackground: true,
             displayHeaderFooter: false,
             preferCSSPageSize: true,
         });
     } finally {
         await page.close();
+    }
+}
+
+export async function runWithBrowser(chromePath, callback) {
+    const launchOptions = await resolveBrowserLaunchOptions(chromePath);
+    const browser = await puppeteer.launch({
+        ...launchOptions,
+        headless: true,
+    });
+
+    try {
+        return await callback(browser);
+    } finally {
+        await browser.close();
     }
 }
 

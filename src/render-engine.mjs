@@ -1,11 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import puppeteer from 'puppeteer';
 import {
     extractTitle,
     renderMarkdownDocument,
 } from './markdown-document.mjs';
-import { renderPdf, resolveBrowserLaunchOptions } from './browser-renderer.mjs';
+import { renderPdfBuffer, runWithBrowser } from './browser-renderer.mjs';
 import { buildManifestMarkdown } from './manifest.mjs';
 import {
     resolveDocumentRenderOptions,
@@ -53,6 +52,28 @@ import {
  * @property {string | null} manifestPath Absolute path to the generated output manifest when enabled.
  * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
  * @property {RenderedFile} file Rendered output metadata for the Markdown content.
+ */
+
+/**
+ * @typedef {Object} RenderedPdfBuffer
+ * @property {string} title Human-readable document title.
+ * @property {string} fileName Source or virtual Markdown file name.
+ * @property {string} pdfName Output PDF file name.
+ * @property {Uint8Array} pdf PDF binary data.
+ * @property {string} html HTML document used to render the PDF.
+ * @property {string | null} sourcePath Absolute path to the source Markdown file, or `null` for in-memory Markdown.
+ */
+
+/**
+ * @typedef {Object} RenderFileToPdfResult
+ * @property {string} inputFile Absolute input file path.
+ * @property {RenderedPdfBuffer} file Rendered PDF binary and metadata for the Markdown file.
+ */
+
+/**
+ * @typedef {Object} RenderStringToPdfResult
+ * @property {string} fileName Virtual source file name used for output naming.
+ * @property {RenderedPdfBuffer} file Rendered PDF binary and metadata for the Markdown content.
  */
 
 /**
@@ -202,6 +223,104 @@ export async function renderMarkdownString(options = {}) {
 }
 
 /**
+ * Render a single HTML document into PDF binary data.
+ *
+ * This function does not write files. It is intended for library consumers that
+ * want to handle the resulting bytes in memory.
+ *
+ * @param {Object} options
+ * @param {string} options.html HTML document to render.
+ * @param {string} [options.documentLabel='document.html'] Label used in render errors.
+ * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
+ * @returns {Promise<Uint8Array>}
+ */
+export async function renderHtmlToPdf(options = {}) {
+    if (typeof options.html !== 'string') {
+        throw new Error('renderHtmlToPdf requires an html string.');
+    }
+
+    return runWithBrowser(options.chromePath ?? null, (browser) => renderPdfBuffer(browser, {
+        html: options.html,
+        documentLabel: options.documentLabel ?? 'document.html',
+        waitForReadySignal: false,
+    }));
+}
+
+/**
+ * Render a single Markdown file into PDF binary data without writing files.
+ *
+ * @param {Object} [options={}]
+ * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
+ * @param {string} [options.inputFile]
+ * @param {string} [options.input] Alias for `inputFile`.
+ * @param {string} [options.outputFileName] Optional PDF file name for metadata purposes.
+ * @param {string} [options.outputFile] Alias for `outputFileName`.
+ * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
+ * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
+ * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @returns {Promise<RenderFileToPdfResult>}
+ */
+export async function renderMarkdownFileToPdf(options = {}) {
+    const renderOptions = resolveFileRenderOptions(options);
+    const sourceFile = await getMarkdownFile(renderOptions.inputFile);
+    const entry = createSourceEntry({
+        fileName: path.basename(sourceFile),
+        sourcePath: sourceFile,
+        outputFileName: renderOptions.outputFileName,
+    });
+
+    return runWithBrowser(renderOptions.chromePath, async (browser) => ({
+        inputFile: renderOptions.inputFile,
+        file: await renderSourceToMemory({
+            browser,
+            entry,
+            baseHref: toDirectoryHref(path.dirname(sourceFile)),
+            renderOptions,
+        }),
+    }));
+}
+
+/**
+ * Render Markdown content supplied as a string into PDF binary data without writing files.
+ *
+ * @param {Object} options
+ * @param {string} options.markdown Markdown source to render.
+ * @param {string} [options.title] Optional document title. Defaults to the first `# Heading` or `Document`.
+ * @param {string} [options.fileName='document.md'] Virtual Markdown file name used for output naming.
+ * @param {string} [options.name] Alias for `fileName`.
+ * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
+ * @param {string} [options.baseDir='.'] Base directory used for relative asset links when `baseHref` is omitted.
+ * @param {string} [options.inputDir] Alias for `baseDir`.
+ * @param {string} [options.baseHref] Explicit `<base href>` value for generated HTML.
+ * @param {string} [options.outputFileName] Optional PDF file name for metadata purposes.
+ * @param {string} [options.outputFile] Alias for `outputFileName`.
+ * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
+ * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
+ * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @returns {Promise<RenderStringToPdfResult>}
+ */
+export async function renderMarkdownStringToPdf(options = {}) {
+    const renderOptions = resolveStringRenderOptions(options);
+    const entry = createSourceEntry({
+        fileName: renderOptions.fileName,
+        sourcePath: null,
+        markdown: renderOptions.markdown,
+        title: renderOptions.title,
+        outputFileName: renderOptions.outputFileName,
+    });
+
+    return runWithBrowser(renderOptions.chromePath, async (browser) => ({
+        fileName: renderOptions.fileName,
+        file: await renderSourceToMemory({
+            browser,
+            entry,
+            baseHref: renderOptions.baseHref,
+            renderOptions,
+        }),
+    }));
+}
+
+/**
  * Render either a top-level Markdown directory or a single Markdown file.
  *
  * `input` may point to either a directory or a `.md` file. The return shape
@@ -279,7 +398,7 @@ export function formatError(error) {
 
 function assertNoOutputFileName(options, apiName) {
     if (options.outputFileName != null || options.outputFile != null) {
-        throw new Error(`${apiName} does not support outputFileName. Use renderMarkdownFile, renderMarkdownString, or renderMarkdownPath with a single Markdown file.`);
+        throw new Error(`${apiName} does not support outputFileName for directory renders. Use a single Markdown input instead.`);
     }
 }
 
@@ -316,31 +435,26 @@ async function renderMarkdownSources({
     logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,
     );
 
-    let browser;
-
     try {
-        const launchOptions = await resolveBrowserLaunchOptions(renderOptions.chromePath);
+        const renderedFiles = await runWithBrowser(renderOptions.chromePath, async (browser) => {
+            await logProgress(`Discovered ${sourceEntries.length} markdown file(s).`);
 
-        browser = await puppeteer.launch({
-            ...launchOptions,
-            headless: true,
+            const files = [];
+
+            for (const [index, entry] of sourceEntries.entries()) {
+                files.push(await renderSourceEntry({
+                    browser,
+                    entry,
+                    baseHref,
+                    renderOptions,
+                    logProgress,
+                    index,
+                    totalEntries: sourceEntries.length,
+                }));
+            }
+
+            return files;
         });
-
-        await logProgress(`Discovered ${sourceEntries.length} markdown file(s).`);
-
-        const renderedFiles = [];
-
-        for (const [index, entry] of sourceEntries.entries()) {
-            renderedFiles.push(await renderSourceEntry({
-                browser,
-                entry,
-                baseHref,
-                renderOptions,
-                logProgress,
-                index,
-                totalEntries: sourceEntries.length,
-            }));
-        }
 
         await logProgress(`Rendered ${renderedFiles.length} PDF file(s).`);
 
@@ -360,10 +474,6 @@ async function renderMarkdownSources({
     } catch (error) {
         await logProgress(`Render failed: ${formatError(error)}`);
         throw error;
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
     }
 }
 
@@ -413,47 +523,69 @@ async function renderSourceEntry({
     index,
     totalEntries,
 }) {
+    const rendered = await renderSourceToMemory({
+        browser,
+        entry,
+        baseHref,
+        renderOptions,
+    });
+    const outputPaths = buildOutputPaths(renderOptions, rendered.fileName, rendered.pdfName);
+
+    await logProgress(`[${index + 1}/${totalEntries}] Rendering ${rendered.fileName}`);
+
+    if (outputPaths.htmlPath) {
+        await fs.writeFile(outputPaths.htmlPath, rendered.html, 'utf8');
+    }
+
+    await fs.writeFile(outputPaths.pdfPath, rendered.pdf);
+
+    await logProgress(`[${index + 1}/${totalEntries}] Completed ${rendered.fileName} -> ${outputPaths.pdfName}`);
+
+    return {
+        title: rendered.title,
+        fileName: rendered.fileName,
+        pdfName: outputPaths.pdfName,
+        pdfPath: outputPaths.pdfPath,
+        htmlPath: outputPaths.htmlPath,
+        sourcePath: rendered.sourcePath,
+    };
+}
+
+async function renderSourceToMemory({
+    browser,
+    entry,
+    baseHref,
+    renderOptions,
+}) {
     const fileName = entry.fileName;
     const sourcePath = entry.sourcePath ?? null;
     const markdown = typeof entry.markdown === 'string'
         ? entry.markdown
         : await fs.readFile(sourcePath, 'utf8');
     const title = entry.title ?? extractTitle(markdown) ?? toTitle(fileName);
-    const outputPaths = buildOutputPaths(renderOptions, fileName, entry.outputFileName);
+    const pdfName = resolvePdfName(fileName, entry.outputFileName);
     const html = await renderMarkdownDocument({
         markdown,
         title,
         baseHref,
         paperLayout: renderOptions.paperLayout,
     });
-
-    await logProgress(`[${index + 1}/${totalEntries}] Rendering ${fileName}`);
-
-    if (outputPaths.htmlPath) {
-        await fs.writeFile(outputPaths.htmlPath, html, 'utf8');
-    }
-
-    await renderPdf(browser, {
+    const pdf = await renderPdfBuffer(browser, {
         html,
-        pdfPath: outputPaths.pdfPath,
-        documentLabel: outputPaths.documentLabel,
+        documentLabel: fileName,
     });
-
-    await logProgress(`[${index + 1}/${totalEntries}] Completed ${fileName} -> ${outputPaths.pdfName}`);
 
     return {
         title,
         fileName,
-        pdfName: outputPaths.pdfName,
-        pdfPath: outputPaths.pdfPath,
-        htmlPath: outputPaths.htmlPath,
+        pdfName,
+        pdf,
+        html,
         sourcePath,
     };
 }
 
-function buildOutputPaths(renderOptions, fileName, outputFileName) {
-    const defaultBaseName = fileName.replace(/\.md$/i, '');
-    const pdfName = outputFileName ?? `${defaultBaseName}.pdf`;
+function buildOutputPaths(renderOptions, fileName, pdfName) {
     const htmlName = `${pdfName.replace(/\.pdf$/i, '')}.html`;
     const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, htmlName) : null;
 
@@ -461,8 +593,12 @@ function buildOutputPaths(renderOptions, fileName, outputFileName) {
         pdfName,
         pdfPath: path.join(renderOptions.outputDir, pdfName),
         htmlPath,
-        documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
     };
+}
+
+function resolvePdfName(fileName, outputFileName) {
+    const defaultBaseName = fileName.replace(/\.md$/i, '');
+    return outputFileName ?? `${defaultBaseName}.pdf`;
 }
 
 async function statInputPath(inputPath) {

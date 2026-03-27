@@ -170,96 +170,72 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 Minimal examples with only the essential options:
 
 ```js
-import { renderMarkdownDirectory, renderMarkdownToHtml } from 'md-to-pdf-renderer';
-import { renderMarkdownFile, renderMarkdownPath, renderMarkdownString } from 'md-to-pdf-renderer';
-
-await renderMarkdownPath({
-  input: 'docs/guide.md',
-});
-
-await renderMarkdownDirectory({
-  inputDir: 'docs',
-});
-
-await renderMarkdownFile({
-  inputFile: 'docs/guide.md',
-});
-
-await renderMarkdownString({
-  markdown: '# In Memory\n\nHello from a variable.',
-});
+import {
+  renderHtmlToPdf,
+  renderMarkdownFileToPdf,
+  renderMarkdownStringToPdf,
+  renderMarkdownToHtml,
+} from 'md-to-pdf-renderer';
 
 const html = await renderMarkdownToHtml({
   markdown: '# Hello\n\n[[TOC]]',
+});
+
+const pdf = await renderHtmlToPdf({
+  html,
+});
+
+const stringPdf = await renderMarkdownStringToPdf({
+  markdown: '# In Memory\n\nHello from a variable.',
+});
+
+const filePdf = await renderMarkdownFileToPdf({
+  inputFile: 'docs/guide.md',
 });
 ```
 
 Available exports:
 
-- `renderMarkdownPath(options)` auto-detects whether `input` is a directory or a single Markdown file.
-- `renderMarkdownDirectory(options)` renders a directory of Markdown files to PDF and returns output metadata.
-- `renderMarkdownFile(options)` renders one Markdown file to PDF and returns file metadata.
-- `renderMarkdownString(options)` renders Markdown content from a string to PDF and returns file metadata.
+- `renderHtmlToPdf(options)` renders HTML to PDF bytes without writing files.
+- `renderMarkdownFileToPdf(options)` renders one Markdown file to PDF bytes without writing files.
+- `renderMarkdownStringToPdf(options)` renders Markdown content from a string to PDF bytes without writing files.
 - `renderMarkdownToHtml(options)` renders a single Markdown string to HTML without writing files.
 
-`renderMarkdownDirectory(options)` options:
+The library API is intentionally memory-oriented. If you want files on disk, use the CLI.
 
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `inputDir` / `input` | `string` | `.` | Directory containing top-level `*.md` files |
-| `outputDir` / `output` | `string` | `.` | Directory where PDFs are written |
-| `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML files are also written |
-| `writeManifest` / `manifest` | `boolean` | `false` | Whether to write `<output>/README.md` |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
-| `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
-
-`renderMarkdownFile(options)` options:
+`renderMarkdownFileToPdf(options)` options:
 
 | Field | Type | Default | Description |
 | ---- | ---- | ---- | ---- |
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `inputFile` / `input` | `string` | Required | Markdown file to render |
-| `outputDir` / `output` | `string` | `.` | Directory where PDFs are written |
-| `outputFileName` / `outputFile` | `string` | Source file name with `.pdf` | Custom PDF file name for the rendered output |
-| `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML file is also written |
-| `writeManifest` / `manifest` | `boolean` | `false` | Whether to write `<output>/README.md` |
+| `outputFileName` / `outputFile` | `string` | Source file name with `.pdf` | Custom PDF file name for returned metadata |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
 | `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
-| `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
 
-`renderMarkdownPath(options)`:
-
-- Accepts `input` as either a directory path or a single Markdown file path.
-- Reuses the same output options as `renderMarkdownDirectory()` and `renderMarkdownFile()`.
-- Returns the directory result shape for directory input and the single-file result shape for file input.
-- Supports `outputFileName` only when `input` resolves to a single Markdown file.
-- Supports `manifest` to enable manifest generation for either mode.
-
-`renderMarkdownString(options)` options:
+`renderMarkdownStringToPdf(options)` options:
 
 | Field | Type | Default | Description |
 | ---- | ---- | ---- | ---- |
 | `markdown` | `string` | Required | Markdown source to render from memory |
-| `title` | `string` | First `# Heading` or `Document` | HTML document title and manifest title |
+| `title` | `string` | First `# Heading` or `Document` | HTML document title |
 | `fileName` / `name` | `string` | `document.md` | Virtual Markdown file name used for output naming |
 | `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
 | `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
 | `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
-| `outputDir` / `output` | `string` | `.` | Directory where PDFs are written |
-| `outputFileName` / `outputFile` | `string` | Virtual file name with `.pdf` | Custom PDF file name for the rendered output |
-| `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML file is also written |
-| `writeManifest` / `manifest` | `boolean` | `false` | Whether to write `<output>/README.md` |
+| `outputFileName` / `outputFile` | `string` | Virtual file name with `.pdf` | Custom PDF file name for returned metadata |
 | `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
 | `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
-| `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
+
+`renderHtmlToPdf(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `html` | `string` | Required | HTML document to render |
+| `documentLabel` | `string` | `document.html` | Label used in render errors |
+| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
 
 
 `renderMarkdownToHtml(options)` options:
