@@ -1,4 +1,5 @@
-import { formatError, renderMarkdownPath } from './render-engine.mjs';
+import { formatError } from './render-engine.mjs';
+import { renderMarkdownPath } from './file-renderer.mjs';
 
 /**
  * Return the CLI help text used by `--help`.
