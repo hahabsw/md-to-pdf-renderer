@@ -165,91 +165,6 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 | `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
 | `--chrome-path` | Optional path to a custom Chrome or Chromium executable | Bundled Puppeteer browser |
 
-### Programmatic API
-
-Minimal examples with only the essential options:
-
-```js
-import {
-  renderHtmlToPdf,
-  renderMarkdownFileToPdf,
-  renderMarkdownStringToPdf,
-  renderMarkdownToHtml,
-} from 'md-to-pdf-renderer';
-
-const html = await renderMarkdownToHtml({
-  markdown: '# Hello\n\n[[TOC]]',
-});
-
-const pdf = await renderHtmlToPdf({
-  html,
-});
-
-const stringPdf = await renderMarkdownStringToPdf({
-  markdown: '# In Memory\n\nHello from a variable.',
-});
-
-const filePdf = await renderMarkdownFileToPdf({
-  inputFile: 'docs/guide.md',
-});
-```
-
-Available exports:
-
-- `renderHtmlToPdf(options)` renders HTML to PDF bytes without writing files.
-- `renderMarkdownFileToPdf(options)` renders one Markdown file to PDF bytes without writing files.
-- `renderMarkdownStringToPdf(options)` renders Markdown content from a string to PDF bytes without writing files.
-- `renderMarkdownToHtml(options)` renders a single Markdown string to HTML without writing files.
-
-The library API is intentionally memory-oriented. If you want files on disk, use the CLI.
-
-`renderMarkdownFileToPdf(options)` options:
-
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `inputFile` / `input` | `string` | Required | Markdown file to render |
-| `outputFileName` / `outputFile` | `string` | Source file name with `.pdf` | Custom PDF file name for returned metadata |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
-
-`renderMarkdownStringToPdf(options)` options:
-
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `markdown` | `string` | Required | Markdown source to render from memory |
-| `title` | `string` | First `# Heading` or `Document` | HTML document title |
-| `fileName` / `name` | `string` | `document.md` | Virtual Markdown file name used for output naming |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
-| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
-| `outputFileName` / `outputFile` | `string` | Virtual file name with `.pdf` | Custom PDF file name for returned metadata |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
-
-`renderHtmlToPdf(options)` options:
-
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `html` | `string` | Required | HTML document to render |
-| `documentLabel` | `string` | `document.html` | Label used in render errors |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
-
-
-`renderMarkdownToHtml(options)` options:
-
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `markdown` | `string` | Required | Markdown source to render |
-| `title` | `string` | First `# Heading` or `Document` | HTML document title |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
-| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-
 ### Output structure
 
 The tool generates:
@@ -275,6 +190,184 @@ output/html/
   01-overview.html
   02-architecture.html
 ```
+
+### Programmatic API
+
+Minimal examples with only the essential options:
+
+```js
+import {
+  renderHtmlToPdf,
+  renderMarkdownFileToPdf,
+  renderMarkdownStringToPdf,
+  renderMarkdownToHtml,
+} from 'md-to-pdf-renderer';
+
+const html = await renderMarkdownToHtml({
+  markdown: '# Hello\n\n[[TOC]]',
+});
+
+const pdf = await renderHtmlToPdf({
+  html,
+});
+
+const stringResult = await renderMarkdownStringToPdf({
+  markdown: '# In Memory\n\nHello from a variable.',
+});
+
+const fileResult = await renderMarkdownFileToPdf({
+  inputFile: 'docs/guide.md',
+});
+
+console.log(pdf);                  // Uint8Array
+console.log(stringResult.file.pdf); // Uint8Array
+console.log(fileResult.file.pdf);   // Uint8Array
+```
+
+Available exports:
+
+- `renderHtmlToPdf(options)` renders HTML to PDF bytes without writing files.
+- `renderMarkdownFileToPdf(options)` renders one Markdown file to PDF bytes without writing files.
+- `renderMarkdownStringToPdf(options)` renders Markdown content from a string to PDF bytes without writing files.
+- `renderMarkdownToHtml(options)` renders a single Markdown string to HTML without writing files.
+
+The library API is intentionally memory-oriented. If you want files on disk, use the CLI.
+
+The PDF-producing APIs return an object, not raw bytes directly. The actual PDF binary is in `result.file.pdf`.
+
+Example:
+
+```js
+const result = await renderMarkdownStringToPdf({
+  markdown: '# Hello\n\nRendered in memory.',
+  fileName: 'hello.md',
+});
+
+console.log(result.fileName);      // 'hello.md'
+console.log(result.file.title);    // 'Hello'
+console.log(result.file.pdfName);  // 'hello.pdf'
+console.log(result.file.html);     // rendered HTML string
+console.log(result.file.pdf);      // Uint8Array
+```
+
+If you only need the PDF bytes, destructure them:
+
+```js
+const {
+  file: { pdf },
+} = await renderMarkdownStringToPdf({
+  markdown: '# Hello',
+});
+
+console.log(pdf); // Uint8Array
+```
+
+If your source data starts as an object instead of a Markdown string, convert it to Markdown first and then read the PDF bytes from `result.file.pdf`:
+
+```js
+import { renderMarkdownStringToPdf } from 'md-to-pdf-renderer';
+
+const report = {
+  title: 'Weekly Report',
+  summary: 'Build is stable and release prep has started.',
+  items: [
+    'Completed PDF renderer refactor',
+    'Added memory-based API',
+    'Updated CLI defaults',
+  ],
+};
+
+function reportToMarkdown(data) {
+  return [
+    `# ${data.title}`,
+    '',
+    data.summary,
+    '',
+    '## Highlights',
+    '',
+    ...data.items.map((item) => `- ${item}`),
+  ].join('\n');
+}
+
+const result = await renderMarkdownStringToPdf({
+  markdown: reportToMarkdown(report),
+  fileName: 'weekly-report.md',
+  outputFileName: 'weekly-report.pdf',
+});
+
+console.log(result.file.pdf); // Uint8Array
+```
+
+`renderMarkdownFileToPdf(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
+| `inputFile` / `input` | `string` | Required | Markdown file to render |
+| `outputFileName` / `outputFile` | `string` | Source file name with `.pdf` | Custom PDF file name for returned metadata |
+| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
+| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
+| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+
+`renderMarkdownFileToPdf()` return shape:
+
+| Field | Type | Description |
+| ---- | ---- | ---- |
+| `inputFile` | `string` | Absolute input file path |
+| `file.title` | `string` | Resolved document title |
+| `file.fileName` | `string` | Source Markdown file name |
+| `file.pdfName` | `string` | Output PDF file name used in metadata |
+| `file.pdf` | `Uint8Array` | PDF binary data |
+| `file.html` | `string` | Rendered HTML used to generate the PDF |
+| `file.sourcePath` | `string` | Absolute source Markdown file path |
+
+`renderMarkdownStringToPdf(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `markdown` | `string` | Required | Markdown source to render from memory |
+| `title` | `string` | First `# Heading` or `Document` | HTML document title |
+| `fileName` / `name` | `string` | `document.md` | Virtual Markdown file name used for output naming |
+| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
+| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
+| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
+| `outputFileName` / `outputFile` | `string` | Virtual file name with `.pdf` | Custom PDF file name for returned metadata |
+| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
+| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
+| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+
+`renderMarkdownStringToPdf()` return shape:
+
+| Field | Type | Description |
+| ---- | ---- | ---- |
+| `fileName` | `string` | Virtual Markdown file name |
+| `file.title` | `string` | Resolved document title |
+| `file.fileName` | `string` | Virtual Markdown file name again inside the file metadata |
+| `file.pdfName` | `string` | Output PDF file name used in metadata |
+| `file.pdf` | `Uint8Array` | PDF binary data |
+| `file.html` | `string` | Rendered HTML used to generate the PDF |
+| `file.sourcePath` | `null` | Always `null` for in-memory Markdown |
+
+`renderHtmlToPdf(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `html` | `string` | Required | HTML document to render |
+| `documentLabel` | `string` | `document.html` | Label used in render errors |
+| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+
+
+`renderMarkdownToHtml(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `markdown` | `string` | Required | Markdown source to render |
+| `title` | `string` | First `# Heading` or `Document` | HTML document title |
+| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
+| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
+| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
+| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
+| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
 
 ### Rendering notes
 
