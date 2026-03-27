@@ -167,42 +167,30 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 
 ### Programmatic API
 
+Minimal examples with only the essential options:
+
 ```js
 import { renderMarkdownDirectory, renderMarkdownToHtml } from 'md-to-pdf-renderer';
 import { renderMarkdownFile, renderMarkdownPath, renderMarkdownString } from 'md-to-pdf-renderer';
 
 await renderMarkdownPath({
   input: 'docs/guide.md',
-  output: 'out',
 });
 
 await renderMarkdownDirectory({
   inputDir: 'docs',
-  outputDir: 'out',
-  htmlDir: 'out/html',
-  manifest: true,
-  logFile: true,
 });
 
 await renderMarkdownFile({
   inputFile: 'docs/guide.md',
-  outputDir: 'out',
-  manifest: true,
-  outputFileName: 'guide-v2.pdf',
 });
 
 await renderMarkdownString({
   markdown: '# In Memory\n\nHello from a variable.',
-  fileName: 'in-memory.md',
-  outputDir: 'out',
-  manifest: true,
-  outputFileName: 'in-memory-final.pdf',
 });
 
 const html = await renderMarkdownToHtml({
   markdown: '# Hello\n\n[[TOC]]',
-  title: 'Hello',
-  baseDir: 'docs',
 });
 ```
 
@@ -229,17 +217,6 @@ Available exports:
 | `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
 | `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
 
-`renderMarkdownDirectory(options)` return value:
-
-| Field | Type | Description |
-| ---- | ---- | ---- |
-| `inputDir` | `string` | Absolute input directory path |
-| `outputDir` | `string` | Absolute output directory path |
-| `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
-| `manifestPath` | `string \| null` | Absolute path to generated manifest when enabled |
-| `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
-| `files` | `Array<{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }>` | Per-file output metadata |
-
 `renderMarkdownFile(options)` options:
 
 | Field | Type | Default | Description |
@@ -255,17 +232,6 @@ Available exports:
 | `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
 | `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
 | `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
-
-`renderMarkdownFile(options)` return value:
-
-| Field | Type | Description |
-| ---- | ---- | ---- |
-| `inputFile` | `string` | Absolute input file path |
-| `outputDir` | `string` | Absolute output directory path |
-| `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
-| `manifestPath` | `string \| null` | Absolute path to generated manifest when enabled |
-| `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
-| `file` | `{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }` | Output metadata for the rendered file |
 
 `renderMarkdownPath(options)`:
 
@@ -295,16 +261,6 @@ Available exports:
 | `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
 | `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
 
-`renderMarkdownString(options)` return value:
-
-| Field | Type | Description |
-| ---- | ---- | ---- |
-| `fileName` | `string` | Virtual input file name used for naming outputs |
-| `outputDir` | `string` | Absolute output directory path |
-| `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
-| `manifestPath` | `string \| null` | Absolute path to generated manifest when enabled |
-| `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
-| `file` | `{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }` | Output metadata for the rendered Markdown string. `sourcePath` is `null` |
 
 `renderMarkdownToHtml(options)` options:
 
