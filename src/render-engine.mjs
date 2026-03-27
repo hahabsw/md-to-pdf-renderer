@@ -9,6 +9,7 @@ import { renderPdf, resolveBrowserLaunchOptions } from './browser-renderer.mjs';
 import { buildManifestMarkdown } from './manifest.mjs';
 import {
     resolveDocumentRenderOptions,
+    resolveFileRenderOptions,
     resolveRenderOptions,
     toDirectoryHref,
 } from './render-options.mjs';
@@ -31,6 +32,16 @@ import {
  * @property {string} manifestPath Absolute path to the generated output manifest.
  * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
  * @property {RenderedFile[]} files Rendered output metadata for each Markdown file.
+ */
+
+/**
+ * @typedef {Object} RenderFileResult
+ * @property {string} inputFile Absolute input file path.
+ * @property {string} outputDir Absolute output directory path.
+ * @property {string | null} htmlDir Absolute HTML output directory path when enabled.
+ * @property {string} manifestPath Absolute path to the generated output manifest.
+ * @property {string | null} renderLogPath Absolute path to the render log when `logFile` is enabled.
+ * @property {RenderedFile} file Rendered output metadata for the Markdown file.
  */
 
 /**
@@ -58,103 +69,98 @@ import {
  */
 export async function renderMarkdownDirectory(options = {}) {
     const renderOptions = resolveRenderOptions(options);
-    const logProgress = createLogger(renderOptions);
+    const files = await getMarkdownFiles(renderOptions.inputDir);
 
-    await fs.mkdir(renderOptions.outputDir, { recursive: true });
-
-    if (renderOptions.htmlDir) {
-        await fs.mkdir(renderOptions.htmlDir, { recursive: true });
-    }
-
-    if (renderOptions.logToFile) {
-        await fs.writeFile(renderOptions.renderLogPath, '', 'utf8');
-    }
-
-    await logProgress(
-        `Render started.
-    input=${renderOptions.inputDir}
-    output=${renderOptions.outputDir}
-    html=${renderOptions.htmlDir ?? 'disabled'}
-    paperSize=${renderOptions.paperLayout.sizeDisplayValue}
-    orientation=${renderOptions.paperOrientation.displayValue}
-    logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,
-    );
-
-    const manifest = [];
-    let browser;
-
-    try {
-        const launchOptions = await resolveBrowserLaunchOptions(renderOptions.chromePath);
-
-        browser = await puppeteer.launch({
-            ...launchOptions,
-            headless: true,
-        });
-
-        const files = await getMarkdownFiles(renderOptions.inputDir);
-        const baseHref = toDirectoryHref(renderOptions.inputDir);
-
-        await logProgress(`Discovered ${files.length} markdown file(s).`);
-
-        for (const [index, fileName] of files.entries()) {
-            const sourcePath = path.join(renderOptions.inputDir, fileName);
-            const markdown = await fs.readFile(sourcePath, 'utf8');
-            const title = extractTitle(markdown) ?? toTitle(fileName);
-            const html = await renderMarkdownDocument({
-                markdown,
-                title,
-                baseHref,
-                paperLayout: renderOptions.paperLayout,
-            });
-            const baseName = fileName.replace(/\.md$/i, '');
-            const pdfPath = path.join(renderOptions.outputDir, `${baseName}.pdf`);
-            const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, `${baseName}.html`) : null;
-
-            await logProgress(`[${index + 1}/${files.length}] Rendering ${fileName}`);
-            if (htmlPath) {
-                await fs.writeFile(htmlPath, html, 'utf8');
-            }
-            await renderPdf(browser, {
-                html,
-                pdfPath,
-                documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
-            });
-            await logProgress(`[${index + 1}/${files.length}] Completed ${fileName} -> ${baseName}.pdf`);
-
-            manifest.push({
-                title,
-                fileName,
-                pdfName: `${baseName}.pdf`,
-                pdfPath,
-                htmlPath,
-                sourcePath,
-            });
-        }
-        await logProgress(`Rendered ${manifest.length} PDF file(s).`);
-
-        const manifestPath = path.join(renderOptions.outputDir, 'README.md');
-        const manifestMarkdown = buildManifestMarkdown(manifest);
-
-        await fs.writeFile(manifestPath, manifestMarkdown, 'utf8');
-        await logProgress(`Wrote manifest: ${manifestPath}`);
-        await logProgress('Render finished successfully.');
-
-        return {
+    return renderMarkdownSources({
+        renderOptions,
+        inputLabel: renderOptions.inputDir,
+        sourceFiles: files.map((fileName) => path.join(renderOptions.inputDir, fileName)),
+        baseHref: toDirectoryHref(renderOptions.inputDir),
+        discoveredMessage: `Discovered ${files.length} markdown file(s).`,
+        buildResult: ({ manifestPath, files: renderedFiles }) => ({
             inputDir: renderOptions.inputDir,
             outputDir: renderOptions.outputDir,
             htmlDir: renderOptions.htmlDir,
             manifestPath,
             renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
-            files: manifest,
-        };
-    } catch (error) {
-        await logProgress(`Render failed: ${formatError(error)}`);
-        throw error;
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
+            files: renderedFiles,
+        }),
+    });
+}
+
+/**
+ * Render a single Markdown file into PDF output.
+ *
+ * Paths may be absolute or relative to `cwd`. The PDF file is written into
+ * `outputDir` using the Markdown file name, and a one-item manifest is still
+ * generated for consistency with directory renders.
+ *
+ * @param {Object} [options={}]
+ * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
+ * @param {string} [options.inputFile]
+ * @param {string} [options.input] Alias for `inputFile`.
+ * @param {string} [options.outputDir]
+ * @param {string} [options.output] Alias for `outputDir`.
+ * @param {string | null} [options.htmlDir]
+ * @param {string | null} [options.html] Alias for `htmlDir`.
+ * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
+ * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @param {boolean} [options.logToFile=false]
+ * @param {boolean} [options.logFile=false] Alias for `logToFile`.
+ * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
+ * @param {(message: string) => (void | Promise<void>)} [options.onProgress] Callback invoked for each progress message.
+ * @returns {Promise<RenderFileResult>}
+ */
+export async function renderMarkdownFile(options = {}) {
+    const renderOptions = resolveFileRenderOptions(options);
+    const sourceFile = await getMarkdownFile(renderOptions.inputFile);
+
+    return renderMarkdownSources({
+        renderOptions,
+        inputLabel: renderOptions.inputFile,
+        sourceFiles: [sourceFile],
+        baseHref: toDirectoryHref(path.dirname(sourceFile)),
+        discoveredMessage: `Discovered 1 markdown file(s).`,
+        buildResult: ({ manifestPath, files: renderedFiles }) => ({
+            inputFile: renderOptions.inputFile,
+            outputDir: renderOptions.outputDir,
+            htmlDir: renderOptions.htmlDir,
+            manifestPath,
+            renderLogPath: renderOptions.logToFile ? renderOptions.renderLogPath : null,
+            file: renderedFiles[0],
+        }),
+    });
+}
+
+/**
+ * Render either a top-level Markdown directory or a single Markdown file.
+ *
+ * `input` may point to either a directory or a `.md` file. The return shape
+ * depends on the detected input type.
+ *
+ * @param {Object} [options={}]
+ * @param {string} [options.cwd=process.cwd()] Base directory used to resolve relative paths.
+ * @param {string} [options.input='.'] Directory or Markdown file path.
+ * @returns {Promise<RenderDirectoryResult | RenderFileResult>}
+ */
+export async function renderMarkdownPath(options = {}) {
+    const cwd = path.resolve(options.cwd ?? process.cwd());
+    const inputPath = path.resolve(cwd, options.input ?? options.inputDir ?? options.inputFile ?? '.');
+    const stats = await statInputPath(inputPath);
+
+    if (stats.isDirectory()) {
+        return renderMarkdownDirectory({
+            ...options,
+            cwd,
+            inputDir: inputPath,
+        });
     }
+
+    return renderMarkdownFile({
+        ...options,
+        cwd,
+        inputFile: inputPath,
+    });
 }
 
 /**
@@ -210,18 +216,120 @@ function createLogger({ logToFile, renderLogPath, onProgress }) {
     };
 }
 
-async function getMarkdownFiles(directoryPath) {
-    let stats;
+async function renderMarkdownSources({
+    renderOptions,
+    inputLabel,
+    sourceFiles,
+    baseHref,
+    discoveredMessage,
+    buildResult,
+}) {
+    const logProgress = createLogger(renderOptions);
+
+    await fs.mkdir(renderOptions.outputDir, { recursive: true });
+
+    if (renderOptions.htmlDir) {
+        await fs.mkdir(renderOptions.htmlDir, { recursive: true });
+    }
+
+    if (renderOptions.logToFile) {
+        await fs.writeFile(renderOptions.renderLogPath, '', 'utf8');
+    }
+
+    await logProgress(
+        `Render started.
+    input=${inputLabel}
+    output=${renderOptions.outputDir}
+    html=${renderOptions.htmlDir ?? 'disabled'}
+    paperSize=${renderOptions.paperLayout.sizeDisplayValue}
+    orientation=${renderOptions.paperOrientation.displayValue}
+    logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,
+    );
+
+    let browser;
 
     try {
-        stats = await fs.stat(directoryPath);
+        const launchOptions = await resolveBrowserLaunchOptions(renderOptions.chromePath);
+
+        browser = await puppeteer.launch({
+            ...launchOptions,
+            headless: true,
+        });
+
+        await logProgress(discoveredMessage);
+
+        const renderedFiles = [];
+
+        for (const [index, sourcePath] of sourceFiles.entries()) {
+            const fileName = path.basename(sourcePath);
+            const markdown = await fs.readFile(sourcePath, 'utf8');
+            const title = extractTitle(markdown) ?? toTitle(fileName);
+            const html = await renderMarkdownDocument({
+                markdown,
+                title,
+                baseHref,
+                paperLayout: renderOptions.paperLayout,
+            });
+            const baseName = fileName.replace(/\.md$/i, '');
+            const pdfPath = path.join(renderOptions.outputDir, `${baseName}.pdf`);
+            const htmlPath = renderOptions.htmlDir ? path.join(renderOptions.htmlDir, `${baseName}.html`) : null;
+
+            await logProgress(`[${index + 1}/${sourceFiles.length}] Rendering ${fileName}`);
+            if (htmlPath) {
+                await fs.writeFile(htmlPath, html, 'utf8');
+            }
+            await renderPdf(browser, {
+                html,
+                pdfPath,
+                documentLabel: htmlPath ? path.basename(htmlPath) : fileName,
+            });
+            await logProgress(`[${index + 1}/${sourceFiles.length}] Completed ${fileName} -> ${baseName}.pdf`);
+
+            renderedFiles.push({
+                title,
+                fileName,
+                pdfName: `${baseName}.pdf`,
+                pdfPath,
+                htmlPath,
+                sourcePath,
+            });
+        }
+
+        await logProgress(`Rendered ${renderedFiles.length} PDF file(s).`);
+
+        const manifestPath = path.join(renderOptions.outputDir, 'README.md');
+        await fs.writeFile(manifestPath, buildManifestMarkdown(renderedFiles), 'utf8');
+        await logProgress(`Wrote manifest: ${manifestPath}`);
+        await logProgress('Render finished successfully.');
+
+        return buildResult({
+            manifestPath,
+            files: renderedFiles,
+        });
+    } catch (error) {
+        await logProgress(`Render failed: ${formatError(error)}`);
+        throw error;
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
+    }
+}
+
+async function statInputPath(inputPath) {
+    try {
+        return await fs.stat(inputPath);
     } catch (error) {
         if (error?.code === 'ENOENT') {
-            throw new Error(`Input directory does not exist: ${directoryPath}`);
+            throw new Error(`Input path does not exist: ${inputPath}`);
         }
 
         throw error;
     }
+}
+
+async function getMarkdownFiles(directoryPath) {
+    const stats = await statInputPath(directoryPath);
 
     if (!stats.isDirectory()) {
         throw new Error(`Input path is not a directory: ${directoryPath}`);
@@ -243,6 +351,20 @@ async function getMarkdownFiles(directoryPath) {
     }
 
     return markdownFiles;
+}
+
+async function getMarkdownFile(filePath) {
+    const stats = await statInputPath(filePath);
+
+    if (!stats.isFile()) {
+        throw new Error(`Input path is not a file: ${filePath}`);
+    }
+
+    if (!filePath.endsWith('.md')) {
+        throw new Error(`Input file is not a Markdown file: ${filePath}`);
+    }
+
+    return filePath;
 }
 
 function toTitle(fileName) {

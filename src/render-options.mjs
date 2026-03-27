@@ -29,6 +29,29 @@ export function resolveRenderOptions(options = {}) {
     };
 }
 
+export function resolveFileRenderOptions(options = {}) {
+    const cwd = path.resolve(options.cwd ?? process.cwd());
+    const inputFile = path.resolve(cwd, options.inputFile ?? options.input ?? '.');
+    const outputDir = path.resolve(cwd, options.outputDir ?? options.output ?? 'output');
+    const htmlTarget = options.htmlDir ?? options.html ?? null;
+    const htmlDir = htmlTarget ? path.resolve(cwd, htmlTarget) : null;
+    const logToFile = Boolean(options.logToFile ?? options.logFile);
+    const paperOrientation = resolvePaperOrientation(options.orientation);
+    const paperLayout = resolvePaperLayout(options.paperSize, paperOrientation);
+
+    return {
+        inputFile,
+        outputDir,
+        htmlDir,
+        chromePath: options.chromePath ?? null,
+        logToFile,
+        renderLogPath: path.join(outputDir, 'render.log'),
+        onProgress: typeof options.onProgress === 'function' ? options.onProgress : async () => {},
+        paperOrientation,
+        paperLayout,
+    };
+}
+
 export function resolveDocumentRenderOptions(options = {}) {
     if (typeof options.markdown !== 'string') {
         throw new Error('renderMarkdownToHtml requires a markdown string.');

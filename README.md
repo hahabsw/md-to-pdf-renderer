@@ -97,6 +97,12 @@ Quick start with `npx`:
 npx md-to-pdf-renderer
 ```
 
+Single file:
+
+```bash
+npx md-to-pdf-renderer --input docs/guide.md --output output
+```
+
 Show CLI help:
 
 ```bash
@@ -129,6 +135,7 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 
 ```js
 import { renderMarkdownDirectory, renderMarkdownToHtml } from 'md-to-pdf-renderer';
+import { renderMarkdownFile, renderMarkdownPath } from 'md-to-pdf-renderer';
 
 await renderMarkdownDirectory({
   inputDir: 'docs',
@@ -142,11 +149,23 @@ const html = await renderMarkdownToHtml({
   title: 'Hello',
   baseDir: 'docs',
 });
+
+await renderMarkdownFile({
+  inputFile: 'docs/guide.md',
+  outputDir: 'out',
+});
+
+await renderMarkdownPath({
+  input: 'docs/guide.md',
+  output: 'out',
+});
 ```
 
 Available exports:
 
 - `renderMarkdownDirectory(options)` renders a directory of Markdown files to PDF and returns output metadata.
+- `renderMarkdownFile(options)` renders one Markdown file to PDF and returns file metadata.
+- `renderMarkdownPath(options)` auto-detects whether `input` is a directory or a single Markdown file.
 - `renderMarkdownToHtml(options)` renders a single Markdown string to HTML without writing files.
 - `main(argv, runtime)` runs the CLI programmatically.
 - `parseArgs(argv)` and `getHelpText()` are exposed for custom wrappers.
@@ -176,6 +195,37 @@ Available exports:
 | `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
 | `files` | `Array<{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }>` | Per-file output metadata |
 
+`renderMarkdownFile(options)` options:
+
+| Field | Type | Default | Description |
+| ---- | ---- | ---- | ---- |
+| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
+| `inputFile` / `input` | `string` | Required | Markdown file to render |
+| `outputDir` / `output` | `string` | `output` | Directory where PDF and manifest are written |
+| `htmlDir` / `html` | `string \| null` | Disabled | Directory where intermediate HTML file is also written |
+| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
+| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
+| `logToFile` / `logFile` | `boolean` | `false` | Whether to write `<output>/render.log` |
+| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+| `onProgress` | `(message: string) => void \| Promise<void>` | No-op | Callback invoked for each progress message |
+
+`renderMarkdownFile(options)` return value:
+
+| Field | Type | Description |
+| ---- | ---- | ---- |
+| `inputFile` | `string` | Absolute input file path |
+| `outputDir` | `string` | Absolute output directory path |
+| `htmlDir` | `string \| null` | Absolute HTML directory path when enabled |
+| `manifestPath` | `string` | Absolute path to generated manifest |
+| `renderLogPath` | `string \| null` | Absolute path to render log when enabled |
+| `file` | `{ title, fileName, pdfName, pdfPath, htmlPath, sourcePath }` | Output metadata for the rendered file |
+
+`renderMarkdownPath(options)`:
+
+- Accepts `input` as either a directory path or a single Markdown file path.
+- Reuses the same output options as `renderMarkdownDirectory()` and `renderMarkdownFile()`.
+- Returns the directory result shape for directory input and the single-file result shape for file input.
+
 `renderMarkdownToHtml(options)` options:
 
 | Field | Type | Default | Description |
@@ -197,7 +247,7 @@ Available exports:
 
 | Option | Description | Default |
 | ---- | ---- | ---- |
-| `--input` | Directory containing source Markdown files | Current working directory |
+| `--input` | Directory or Markdown file to render | Current working directory |
 | `--output` | Directory where PDF files are written | `output` |
 | `--html` | Also write intermediate HTML files to this directory | Disabled |
 | `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |

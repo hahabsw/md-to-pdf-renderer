@@ -11,6 +11,8 @@ import {
     main,
     parseArgs,
     renderMarkdownDirectory,
+    renderMarkdownFile,
+    renderMarkdownPath,
     renderMarkdownToHtml,
 } from '../src/render-pdfs.mjs';
 
@@ -18,6 +20,7 @@ const execFileAsync = promisify(execFile);
 const repoRoot = process.cwd();
 const cliPath = path.join(repoRoot, 'bin', 'md-to-pdf-renderer.mjs');
 const fixtureInputDir = path.join(repoRoot, 'fixtures', 'readme-showcase');
+const fixtureInputFile = path.join(fixtureInputDir, 'rendering-showcase.md');
 
 async function createTempDir() {
     return fs.mkdtemp(path.join(os.tmpdir(), 'md-to-pdf-renderer-test-'));
@@ -51,6 +54,7 @@ test('prints help text', async () => {
     assert.equal(result.code, 0);
     assert.match(result.stdout, /Usage:/);
     assert.match(result.stdout, /--html <dir>/);
+    assert.match(result.stdout, /--input <path>/);
     assert.match(result.stdout, /Default: disabled/);
 });
 
@@ -109,6 +113,27 @@ test('renders PDFs without creating HTML files by default', { timeout: 120_000 }
         assert.match(manifest, /# PDF 산출물 목록/);
 
         await assert.rejects(fs.stat(htmlDirPath), { code: 'ENOENT' });
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('renders a single Markdown file through the CLI', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+    const outputDir = path.join(tempDir, 'output');
+
+    try {
+        const result = await runCli(['--input', fixtureInputFile, '--output', outputDir]);
+
+        assert.equal(result.code, 0, result.stderr || result.stdout);
+
+        const pdfPath = path.join(outputDir, 'rendering-showcase.pdf');
+        const manifest = await fs.readFile(path.join(outputDir, 'README.md'), 'utf8');
+        const pdfStat = await fs.stat(pdfPath);
+
+        assert.ok(pdfStat.size > 0);
+        assert.match(manifest, /rendering-showcase\.pdf/);
+        assert.match(result.stdout, /Discovered 1 markdown file\(s\)\./);
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
@@ -233,6 +258,57 @@ test('renders PDFs through the library API and returns output metadata', { timeo
     }
 });
 
+test('renders a single Markdown file through the library API and returns file metadata', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+    const outputDir = path.join(tempDir, 'output');
+    const htmlDir = path.join(outputDir, 'html');
+
+    try {
+        const result = await renderMarkdownFile({
+            cwd: repoRoot,
+            inputFile: fixtureInputFile,
+            outputDir,
+            htmlDir,
+        });
+
+        assert.equal(result.inputFile, fixtureInputFile);
+        assert.equal(result.outputDir, outputDir);
+        assert.equal(result.file.fileName, 'rendering-showcase.md');
+        assert.ok(result.file.pdfPath.endsWith('rendering-showcase.pdf'));
+        assert.ok(result.file.htmlPath.endsWith('rendering-showcase.html'));
+
+        const pdfStat = await fs.stat(result.file.pdfPath);
+        assert.ok(pdfStat.size > 0);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('auto-detects directory and file inputs through renderMarkdownPath', { timeout: 120_000 }, async () => {
+    const tempDir = await createTempDir();
+    const fileOutputDir = path.join(tempDir, 'file-output');
+    const dirOutputDir = path.join(tempDir, 'dir-output');
+
+    try {
+        const fileResult = await renderMarkdownPath({
+            cwd: repoRoot,
+            input: fixtureInputFile,
+            output: fileOutputDir,
+        });
+        const dirResult = await renderMarkdownPath({
+            cwd: repoRoot,
+            input: fixtureInputDir,
+            output: dirOutputDir,
+        });
+
+        assert.equal(fileResult.file.fileName, 'rendering-showcase.md');
+        assert.equal(dirResult.files.length, 1);
+        assert.equal(dirResult.files[0].fileName, 'rendering-showcase.md');
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+});
+
 test('runs the CLI entrypoint through main() with injected streams', async () => {
     const stdout = [];
     const stderr = [];
@@ -278,9 +354,8 @@ test('returns a non-zero exit code from main() on failure', async () => {
         );
 
         assert.equal(exitCode, 1);
-        assert.ok(stdout.some((chunk) => chunk.includes('Render started.')));
-        assert.ok(stdout.some((chunk) => chunk.includes('Render failed:')));
-        assert.ok(stderr.some((chunk) => chunk.includes('Input directory does not exist:')));
+        assert.equal(stdout.length, 0);
+        assert.ok(stderr.some((chunk) => chunk.includes('Input path does not exist:')));
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
@@ -295,7 +370,7 @@ test('fails with a clear error when the input directory is missing', async () =>
         const result = await runCli(['--input', missingInputDir, '--output', outputDir]);
 
         assert.notEqual(result.code, 0);
-        assert.match(result.stderr || result.stdout, /Input directory does not exist:/);
+        assert.match(result.stderr || result.stdout, /Input path does not exist:/);
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }

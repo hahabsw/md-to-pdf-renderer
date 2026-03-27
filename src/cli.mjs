@@ -1,4 +1,4 @@
-import { formatError, renderMarkdownDirectory } from './render-engine.mjs';
+import { formatError, renderMarkdownPath } from './render-engine.mjs';
 
 /**
  * Return the CLI help text used by `--help`.
@@ -15,7 +15,7 @@ Usage:
   md-to-pdf-renderer [options]
 
 Options:
-  --input <dir>          Source Markdown directory. Default: current working directory
+  --input <path>         Source Markdown directory or file. Default: current working directory
   --output <dir>         PDF output directory. Default: output
   --html <dir>           Also write intermediate HTML files to this directory. Default: disabled
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
@@ -26,6 +26,7 @@ Options:
 
 Examples:
   md-to-pdf-renderer --output output
+  md-to-pdf-renderer --input docs/guide.md --output pdf
   md-to-pdf-renderer --input docs --output pdf --html pdf/html
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
@@ -129,7 +130,7 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
     }
 
     try {
-        await renderMarkdownDirectory({
+        await renderMarkdownPath({
             cwd,
             input: args.input,
             output: args.output,

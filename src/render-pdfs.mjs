@@ -3,7 +3,13 @@ import { fileURLToPath } from 'node:url';
 import { main } from './cli.mjs';
 
 export { getHelpText, main, parseArgs } from './cli.mjs';
-export { formatError, renderMarkdownDirectory, renderMarkdownToHtml } from './render-engine.mjs';
+export {
+    formatError,
+    renderMarkdownDirectory,
+    renderMarkdownFile,
+    renderMarkdownPath,
+    renderMarkdownToHtml,
+} from './render-engine.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
