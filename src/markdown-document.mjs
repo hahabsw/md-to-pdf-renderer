@@ -8,19 +8,22 @@ import markdownItTaskLists from 'markdown-it-task-lists';
 
 const require = createRequire(import.meta.url);
 const katexCssPath = require.resolve('katex/dist/katex.min.css');
+const highlightCssPath = require.resolve('highlight.js/styles/github.css');
 const katex = require('katex');
+const hljs = require('highlight.js');
 const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 let rendererResourcesPromise;
 
 export async function renderMarkdownDocument({ markdown, title, baseHref, paperLayout, cssOverride = '' }) {
-    const { md, katexCss } = await getRendererResources();
+    const { md, katexCss, highlightCss } = await getRendererResources();
 
     return buildHtml({
         markdown,
         title,
         baseHref,
         katexCss,
+        highlightCss,
         md,
         mermaidModuleUrl,
         paperLayout,
@@ -109,9 +112,10 @@ function createMarkdownRenderer() {
     md.renderer.rules.fence = (tokens, idx) => {
         const token = tokens[idx];
         const info = (token.info || '').trim();
+        const language = extractFenceLanguage(info);
         const content = token.content.trimEnd();
 
-        if (info === 'mermaid') {
+        if (language === 'mermaid') {
             const caption = detectDiagramCaption(content);
             return `
                 <figure class="diagram-card">
@@ -121,7 +125,7 @@ function createMarkdownRenderer() {
             `;
         }
 
-        if (info === 'text') {
+        if (language === 'text') {
             return `
                 <div class="code-card text-card">
                     <div class="code-label">TEXT</div>
@@ -130,11 +134,13 @@ function createMarkdownRenderer() {
             `;
         }
 
-        const label = info ? info.toUpperCase() : 'CODE';
+        const label = language ? language.toUpperCase() : 'CODE';
+        const highlighted = highlightCodeBlock(content, language);
+        const codeClassName = buildCodeClassName(language, highlighted.isHighlighted);
         return `
             <div class="code-card">
                 <div class="code-label">${md.utils.escapeHtml(label)}</div>
-                <pre><code>${md.utils.escapeHtml(content)}</code></pre>
+                <pre><code class="${codeClassName}">${highlighted.html}</code></pre>
             </div>
         `;
     };
@@ -146,9 +152,11 @@ async function getRendererResources() {
     if (!rendererResourcesPromise) {
         rendererResourcesPromise = Promise.all([
             loadKatexCss(katexCssPath),
+            fs.readFile(highlightCssPath, 'utf8'),
             Promise.resolve(createMarkdownRenderer()),
-        ]).then(([katexCss, md]) => ({
+        ]).then(([katexCss, highlightCss, md]) => ({
             katexCss,
+            highlightCss,
             md,
         }));
     }
@@ -156,7 +164,7 @@ async function getRendererResources() {
     return rendererResourcesPromise;
 }
 
-function buildHtml({ markdown, title, baseHref, katexCss, md, mermaidModuleUrl, paperLayout, cssOverride }) {
+function buildHtml({ markdown, title, baseHref, katexCss, highlightCss, md, mermaidModuleUrl, paperLayout, cssOverride }) {
     const rendered = md.render(markdown);
 
     return `<!doctype html>
@@ -167,6 +175,7 @@ function buildHtml({ markdown, title, baseHref, katexCss, md, mermaidModuleUrl, 
     <title>${escapeHtml(title)}</title>
     <base href="${escapeHtml(baseHref)}" />
     <style>${katexCss}</style>
+    <style>${highlightCss}</style>
     <style>${buildTemplateCss(paperLayout)}</style>
     ${cssOverride ? `<style>${cssOverride}</style>` : ''}
     <script type="module">
@@ -437,7 +446,6 @@ function buildTemplateCss(paperLayout) {
     pre code {
         padding: 0;
         background: transparent;
-        color: inherit;
     }
 
     .code-card,
@@ -480,6 +488,13 @@ function buildTemplateCss(paperLayout) {
         font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', monospace;
         font-size: 9.2pt;
         line-height: 1.65;
+    }
+
+    .code-card pre code.hljs {
+        display: block;
+        padding: 0;
+        overflow: visible;
+        background: transparent;
     }
 
     .text-card pre {
@@ -798,6 +813,55 @@ function buildTemplateCss(paperLayout) {
         }
     }
 `;
+}
+
+function extractFenceLanguage(info) {
+    return info.split(/\s+/u)[0]?.trim().toLowerCase() || '';
+}
+
+function highlightCodeBlock(content, language) {
+    if (!content) {
+        return {
+            html: '',
+            isHighlighted: false,
+        };
+    }
+
+    if (language && hljs.getLanguage(language)) {
+        return {
+            html: hljs.highlight(content, {
+                language,
+                ignoreIllegals: true,
+            }).value,
+            isHighlighted: true,
+        };
+    }
+
+    if (!language) {
+        return {
+            html: hljs.highlightAuto(content).value,
+            isHighlighted: true,
+        };
+    }
+
+    return {
+        html: escapeHtml(content),
+        isHighlighted: false,
+    };
+}
+
+function buildCodeClassName(language, isHighlighted) {
+    const classNames = [];
+
+    if (isHighlighted) {
+        classNames.push('hljs');
+    }
+
+    if (language) {
+        classNames.push(`language-${language.replace(/[^a-z0-9_-]+/giu, '-')}`);
+    }
+
+    return classNames.join(' ');
 }
 
 function detectDiagramCaption(content) {

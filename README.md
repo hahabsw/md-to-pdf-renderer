@@ -6,7 +6,7 @@ It is designed for documentation export workflows where the same Markdown source
 
 - A4-oriented PDF layout
 - Mermaid diagram rendering
-- Styled code blocks and plain-text blocks
+- Syntax-highlighted code blocks and plain-text blocks
 - Tables, blockquotes, and general document formatting
 - Task lists, footnotes, and GitHub-style callouts
 - `[[TOC]]` placeholder based table of contents
@@ -52,6 +52,13 @@ Generated output:
 - `fixtures/readme-showcase-output/html/rendering-showcase.html`
 
 The preview HTML above was generated with `--html fixtures/readme-showcase-output/html`.
+
+Preview images from the latest showcase render:
+
+<p>
+  <img src="docs/readme-assets/showcase-overview.png" alt="Showcase overview" width="49%" />
+  <img src="docs/readme-assets/showcase-details.png" alt="Showcase details" width="49%" />
+</p>
 
 
 
@@ -401,6 +408,7 @@ console.log(result.file.pdf); // Uint8Array
 - The title of each document is taken from the first Markdown `# Heading` when available.
 - If no top-level heading exists, the file name is converted into a readable title.
 - Mermaid fences using ````mermaid` are rendered as diagrams.
+- Standard fenced code blocks are syntax highlighted when the language is known, with automatic highlighting as a fallback.
 - Code fences using ````text` are rendered with a plain text oriented layout.
 - Task lists using `- [x]` and `- [ ]` are rendered with checkbox styling.
 - Footnotes using `[^name]` syntax are rendered at the end of the document.

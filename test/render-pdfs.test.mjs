@@ -325,6 +325,23 @@ test('renders HTML through the library API with computed defaults', async () => 
     assert.match(html, /<h2 id="section">Section<\/h2>/);
 });
 
+test('renders fenced code blocks with syntax highlighting', async () => {
+    const html = await renderMarkdownToHtml({
+        markdown: [
+            '# Highlighted',
+            '',
+            '```js',
+            'const answer = 42;',
+            '```',
+        ].join('\n'),
+        baseDir: fixtureInputDir,
+    });
+
+    assert.match(html, /class="hljs language-js"/);
+    assert.match(html, /hljs-keyword/);
+    assert.match(html, /hljs-variable/);
+});
+
 test('applies CSS overrides from a provided file path', async () => {
     const tempDir = await createTempDir();
     const cssPath = path.join(tempDir, 'override.css');

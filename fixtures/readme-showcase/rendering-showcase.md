@@ -32,9 +32,19 @@ This paragraph includes **bold text**, *emphasis*, inline code like `node src/re
 
 ## Code Blocks
 
+Syntax highlighting now supports language-aware fenced code blocks.
+
 ```js
 export function greet(name) {
     return `Hello, ${name}!`;
+}
+```
+
+```json
+{
+  "renderer": "md-to-pdf-renderer",
+  "features": ["pdf", "html", "syntax-highlighting"],
+  "enabled": true
 }
 ```
 
