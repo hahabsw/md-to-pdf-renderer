@@ -56,6 +56,7 @@ test('prints help text', async () => {
     assert.match(result.stdout, /Usage:/);
     assert.match(result.stdout, /--html <dir>/);
     assert.match(result.stdout, /--manifest/);
+    assert.match(result.stdout, /--css <path>/);
     assert.match(result.stdout, /--input <path>/);
     assert.match(result.stdout, /Default: disabled/);
 });
@@ -84,6 +85,7 @@ test('parses CLI arguments for programmatic consumers', () => {
         '--output-file', 'guide.pdf',
         '--html', 'out/html',
         '--manifest',
+        '--css', 'styles/print.css',
         '--paper-size', 'Letter',
         '--orientation', 'landscape',
         '--chrome-path', '/usr/bin/chromium',
@@ -96,6 +98,7 @@ test('parses CLI arguments for programmatic consumers', () => {
         outputFile: 'guide.pdf',
         html: 'out/html',
         manifest: true,
+        css: 'styles/print.css',
         paperSize: 'Letter',
         orientation: 'landscape',
         chromePath: '/usr/bin/chromium',
@@ -277,6 +280,7 @@ test('writes optional HTML and render logs when requested', { timeout: 120_000 }
         assert.match(html, /katex/i);
         assert.match(log, /Render started\./);
         assert.match(log, /html=.*output\/html/);
+        assert.match(log, /css=disabled/);
         assert.match(log, /Render finished successfully\./);
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
@@ -319,6 +323,26 @@ test('renders HTML through the library API with computed defaults', async () => 
 
     assert.match(html, /<title>Derived Title<\/title>/);
     assert.match(html, /<h2 id="section">Section<\/h2>/);
+});
+
+test('applies CSS overrides from a provided file path', async () => {
+    const tempDir = await createTempDir();
+    const cssPath = path.join(tempDir, 'override.css');
+
+    try {
+        await fs.writeFile(cssPath, 'body { color: rgb(1, 2, 3); }\n.code-card { border-width: 5px; }', 'utf8');
+
+        const html = await renderMarkdownToHtml({
+            markdown: '# Styled Title\n\n```js\nconsole.log("hi");\n```',
+            baseDir: fixtureInputDir,
+            cssPath,
+        });
+
+        assert.match(html, /body \{ color: rgb\(1, 2, 3\); \}/);
+        assert.match(html, /\.code-card \{ border-width: 5px; \}/);
+    } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
 });
 
 test('rejects invalid programmatic HTML render input', async () => {

@@ -13,7 +13,7 @@ const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 let rendererResourcesPromise;
 
-export async function renderMarkdownDocument({ markdown, title, baseHref, paperLayout }) {
+export async function renderMarkdownDocument({ markdown, title, baseHref, paperLayout, cssOverride = '' }) {
     const { md, katexCss } = await getRendererResources();
 
     return buildHtml({
@@ -24,6 +24,7 @@ export async function renderMarkdownDocument({ markdown, title, baseHref, paperL
         md,
         mermaidModuleUrl,
         paperLayout,
+        cssOverride,
     });
 }
 
@@ -155,7 +156,7 @@ async function getRendererResources() {
     return rendererResourcesPromise;
 }
 
-function buildHtml({ markdown, title, baseHref, katexCss, md, mermaidModuleUrl, paperLayout }) {
+function buildHtml({ markdown, title, baseHref, katexCss, md, mermaidModuleUrl, paperLayout, cssOverride }) {
     const rendered = md.render(markdown);
 
     return `<!doctype html>
@@ -167,6 +168,7 @@ function buildHtml({ markdown, title, baseHref, katexCss, md, mermaidModuleUrl, 
     <base href="${escapeHtml(baseHref)}" />
     <style>${katexCss}</style>
     <style>${buildTemplateCss(paperLayout)}</style>
+    ${cssOverride ? `<style>${cssOverride}</style>` : ''}
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
 

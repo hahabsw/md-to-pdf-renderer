@@ -1,6 +1,6 @@
 {
     "name": "md-to-pdf-renderer",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "type": "module",
     "license": "MIT",
     "description": "CLI to render Markdown files to print-ready PDF with optional HTML output, Mermaid, KaTeX, TOC, footnotes, and GitHub-style callouts",

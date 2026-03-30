@@ -41,6 +41,7 @@ export function resolveDocumentRenderOptions(options = {}) {
         title,
         baseHref: options.baseHref ?? toDirectoryHref(resolvePathOption(cwd, options.baseDir ?? options.inputDir ?? '.')),
         paperLayout,
+        cssPath: resolveOptionalPathOption(cwd, options.cssPath ?? options.css ?? null),
     };
 }
 
@@ -103,6 +104,7 @@ function resolveRenderRuntimeOptions(options, cwd) {
     return {
         outputDir,
         htmlDir,
+        cssPath: resolveOptionalPathOption(cwd, options.cssPath ?? options.css ?? null),
         chromePath: options.chromePath ?? null,
         logToFile: Boolean(options.logToFile ?? options.logFile),
         writeManifest: Boolean(options.writeManifest ?? options.manifest),

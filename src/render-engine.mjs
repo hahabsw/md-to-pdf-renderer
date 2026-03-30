@@ -66,6 +66,8 @@ export async function renderHtmlToPdf(options = {}) {
  * @param {string} [options.input] Alias for `inputFile`.
  * @param {string} [options.outputFileName] Optional PDF file name for metadata purposes.
  * @param {string} [options.outputFile] Alias for `outputFileName`.
+ * @param {string} [options.cssPath]
+ * @param {string} [options.css] Alias for `cssPath`.
  * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
@@ -105,6 +107,8 @@ export async function renderMarkdownFileToPdf(options = {}) {
  * @param {string} [options.baseHref] Explicit `<base href>` value for generated HTML.
  * @param {string} [options.outputFileName] Optional PDF file name for metadata purposes.
  * @param {string} [options.outputFile] Alias for `outputFileName`.
+ * @param {string} [options.cssPath]
+ * @param {string} [options.css] Alias for `cssPath`.
  * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
@@ -143,6 +147,8 @@ export async function renderMarkdownStringToPdf(options = {}) {
  * @param {string} [options.baseDir='.'] Base directory used for relative asset links when `baseHref` is omitted.
  * @param {string} [options.inputDir] Alias for `baseDir`.
  * @param {string} [options.baseHref] Explicit `<base href>` value for generated HTML.
+ * @param {string} [options.cssPath]
+ * @param {string} [options.css] Alias for `cssPath`.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
  * @returns {Promise<string>}
@@ -155,6 +161,7 @@ export async function renderMarkdownToHtml(options) {
         title: renderOptions.title,
         baseHref: renderOptions.baseHref,
         paperLayout: renderOptions.paperLayout,
+        cssOverride: await readOptionalFileUtf8(renderOptions.cssPath),
     });
 }
 
@@ -205,6 +212,7 @@ export async function renderSourceToMemory({
         title,
         baseHref,
         paperLayout: renderOptions.paperLayout,
+        cssOverride: await readOptionalFileUtf8(renderOptions.cssPath),
     });
     const pdf = await renderPdfBuffer(browser, {
         html,
@@ -289,6 +297,14 @@ export function toTitle(fileName) {
 async function readFileUtf8(filePath) {
     const { readFile } = await import('node:fs/promises');
     return readFile(filePath, 'utf8');
+}
+
+async function readOptionalFileUtf8(filePath) {
+    if (!filePath) {
+        return '';
+    }
+
+    return readFileUtf8(filePath);
 }
 
 async function statFile(filePath) {

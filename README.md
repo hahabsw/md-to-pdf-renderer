@@ -15,6 +15,12 @@ It is designed for documentation export workflows where the same Markdown source
 
 ### Quickstart For Humans And Agents
 
+Quickstart for humans and agents:
+```bash
+npx md-to-pdf-renderer
+```
+This will render all of the markdown files in the current directory and write the output to the current directory.
+
 Fastest successful path:
 
 ```bash
@@ -47,10 +53,7 @@ Generated output:
 
 The preview HTML above was generated with `--html fixtures/readme-showcase-output/html`.
 
-<p>
-  <img src="docs/readme-assets/showcase-overview.png" alt="Rendering showcase overview" width="49%" />
-  <img src="docs/readme-assets/showcase-details.png" alt="Rendering showcase details" width="49%" />
-</p>
+
 
 ### What it does
 
@@ -129,6 +132,12 @@ Show CLI help:
 npx md-to-pdf-renderer --help
 ```
 
+Override the built-in CSS:
+
+```bash
+npx md-to-pdf-renderer --input input --output output --css styles/print.css
+```
+
 ```bash
 npx md-to-pdf-renderer --input input --output output --paper-size A4 --orientation portrait --log-file
 ```
@@ -153,17 +162,20 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 
 ### CLI options
 
-| Option | Description | Default |
-| ---- | ---- | ---- |
-| `--input` | Directory or Markdown file to render | Current working directory |
-| `--output` | Directory where PDF files are written | Current working directory |
-| `--output-file` | PDF file name for single-file input only | Source file name with `.pdf` |
-| `--html` | Also write intermediate HTML files to this directory | Disabled |
-| `--manifest` | Also write `<output>/README.md` manifest | Disabled |
-| `--paper-size` | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4` |
-| `--orientation` | Print orientation: `portrait` or `landscape` | `portrait` |
-| `--log-file` | Write progress logs to `<output>/render.log` | Disabled |
-| `--chrome-path` | Optional path to a custom Chrome or Chromium executable | Bundled Puppeteer browser |
+
+| Option          | Description                                                              | Default                      |
+| --------------- | ------------------------------------------------------------------------ | ---------------------------- |
+| `--input`       | Directory or Markdown file to render                                     | Current working directory    |
+| `--output`      | Directory where PDF files are written                                    | Current working directory    |
+| `--output-file` | PDF file name for single-file input only                                 | Source file name with `.pdf` |
+| `--html`        | Also write intermediate HTML files to this directory                     | Disabled                     |
+| `--manifest`    | Also write `<output>/README.md` manifest                                 | Disabled                     |
+| `--css`         | Append a CSS file after the built-in styles so it can override them      | Disabled                     |
+| `--paper-size`  | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4`                         |
+| `--orientation` | Print orientation: `portrait` or `landscape`                             | `portrait`                   |
+| `--log-file`    | Write progress logs to `<output>/render.log`                             | Disabled                     |
+| `--chrome-path` | Optional path to a custom Chrome or Chromium executable                  | Bundled Puppeteer browser    |
+
 
 ### Output structure
 
@@ -293,6 +305,7 @@ const result = await renderMarkdownStringToPdf({
   markdown: reportToMarkdown(report),
   fileName: 'weekly-report.md',
   outputFileName: 'weekly-report.pdf',
+  cssPath: './styles/print.css',
 });
 
 console.log(result.file.pdf); // Uint8Array
@@ -300,87 +313,102 @@ console.log(result.file.pdf); // Uint8Array
 
 `renderMarkdownFileToPdf(options)` options:
 
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `inputFile` / `input` | `string` | Required | Markdown file to render |
-| `outputFileName` / `outputFile` | `string` | Source file name with `.pdf` | Custom PDF file name for returned metadata |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+
+| Field                           | Type            | Default                      | Description                                                        |
+| ------------------------------- | --------------- | ---------------------------- | ------------------------------------------------------------------ |
+| `cwd`                           | `string`        | `process.cwd()`              | Base path used to resolve relative options                         |
+| `inputFile` / `input`           | `string`        | Required                     | Markdown file to render                                            |
+| `outputFileName` / `outputFile` | `string`        | Source file name with `.pdf` | Custom PDF file name for returned metadata                         |
+| `cssPath` / `css`               | `string`        | Disabled                     | CSS file path appended after the built-in styles                   |
+| `paperSize`                     | `string`        | `A4`                         | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
+| `orientation`                   | `string`        | `portrait`                   | Page orientation: `portrait` or `landscape`                        |
+| `chromePath`                    | `string | null` | Auto-detect                  | Custom Chrome or Chromium executable                               |
+
 
 `renderMarkdownFileToPdf()` return shape:
 
-| Field | Type | Description |
-| ---- | ---- | ---- |
-| `inputFile` | `string` | Absolute input file path |
-| `file.title` | `string` | Resolved document title |
-| `file.fileName` | `string` | Source Markdown file name |
-| `file.pdfName` | `string` | Output PDF file name used in metadata |
-| `file.pdf` | `Uint8Array` | PDF binary data |
-| `file.html` | `string` | Rendered HTML used to generate the PDF |
-| `file.sourcePath` | `string` | Absolute source Markdown file path |
+
+| Field             | Type         | Description                            |
+| ----------------- | ------------ | -------------------------------------- |
+| `inputFile`       | `string`     | Absolute input file path               |
+| `file.title`      | `string`     | Resolved document title                |
+| `file.fileName`   | `string`     | Source Markdown file name              |
+| `file.pdfName`    | `string`     | Output PDF file name used in metadata  |
+| `file.pdf`        | `Uint8Array` | PDF binary data                        |
+| `file.html`       | `string`     | Rendered HTML used to generate the PDF |
+| `file.sourcePath` | `string`     | Absolute source Markdown file path     |
+
 
 `renderMarkdownStringToPdf(options)` options:
 
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `markdown` | `string` | Required | Markdown source to render from memory |
-| `title` | `string` | First `# Heading` or `Document` | HTML document title |
-| `fileName` / `name` | `string` | `document.md` | Virtual Markdown file name used for output naming |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
-| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
-| `outputFileName` / `outputFile` | `string` | Virtual file name with `.pdf` | Custom PDF file name for returned metadata |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+
+| Field                           | Type            | Default                         | Description                                                        |
+| ------------------------------- | --------------- | ------------------------------- | ------------------------------------------------------------------ |
+| `markdown`                      | `string`        | Required                        | Markdown source to render from memory                              |
+| `title`                         | `string`        | First `# Heading` or `Document` | HTML document title                                                |
+| `fileName` / `name`             | `string`        | `document.md`                   | Virtual Markdown file name used for output naming                  |
+| `cwd`                           | `string`        | `process.cwd()`                 | Base path used to resolve relative options                         |
+| `baseDir` / `inputDir`          | `string`        | `.`                             | Base directory for relative asset links                            |
+| `baseHref`                      | `string`        | Derived from `baseDir`          | Explicit `<base href>` value                                       |
+| `outputFileName` / `outputFile` | `string`        | Virtual file name with `.pdf`   | Custom PDF file name for returned metadata                         |
+| `cssPath` / `css`               | `string`        | Disabled                        | CSS file path appended after the built-in styles                   |
+| `paperSize`                     | `string`        | `A4`                            | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
+| `orientation`                   | `string`        | `portrait`                      | Page orientation: `portrait` or `landscape`                        |
+| `chromePath`                    | `string | null` | Auto-detect                     | Custom Chrome or Chromium executable                               |
+
 
 `renderMarkdownStringToPdf()` return shape:
 
-| Field | Type | Description |
-| ---- | ---- | ---- |
-| `fileName` | `string` | Virtual Markdown file name |
-| `file.title` | `string` | Resolved document title |
-| `file.fileName` | `string` | Virtual Markdown file name again inside the file metadata |
-| `file.pdfName` | `string` | Output PDF file name used in metadata |
-| `file.pdf` | `Uint8Array` | PDF binary data |
-| `file.html` | `string` | Rendered HTML used to generate the PDF |
-| `file.sourcePath` | `null` | Always `null` for in-memory Markdown |
+
+| Field             | Type         | Description                                               |
+| ----------------- | ------------ | --------------------------------------------------------- |
+| `fileName`        | `string`     | Virtual Markdown file name                                |
+| `file.title`      | `string`     | Resolved document title                                   |
+| `file.fileName`   | `string`     | Virtual Markdown file name again inside the file metadata |
+| `file.pdfName`    | `string`     | Output PDF file name used in metadata                     |
+| `file.pdf`        | `Uint8Array` | PDF binary data                                           |
+| `file.html`       | `string`     | Rendered HTML used to generate the PDF                    |
+| `file.sourcePath` | `null`       | Always `null` for in-memory Markdown                      |
+
 
 `renderHtmlToPdf(options)` options:
 
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `html` | `string` | Required | HTML document to render |
-| `documentLabel` | `string` | `document.html` | Label used in render errors |
-| `chromePath` | `string \| null` | Auto-detect | Custom Chrome or Chromium executable |
+
+| Field           | Type            | Default         | Description                          |
+| --------------- | --------------- | --------------- | ------------------------------------ |
+| `html`          | `string`        | Required        | HTML document to render              |
+| `documentLabel` | `string`        | `document.html` | Label used in render errors          |
+| `chromePath`    | `string | null` | Auto-detect     | Custom Chrome or Chromium executable |
 
 
 `renderMarkdownToHtml(options)` options:
 
-| Field | Type | Default | Description |
-| ---- | ---- | ---- | ---- |
-| `markdown` | `string` | Required | Markdown source to render |
-| `title` | `string` | First `# Heading` or `Document` | HTML document title |
-| `cwd` | `string` | `process.cwd()` | Base path used to resolve relative options |
-| `baseDir` / `inputDir` | `string` | `.` | Base directory for relative asset links |
-| `baseHref` | `string` | Derived from `baseDir` | Explicit `<base href>` value |
-| `paperSize` | `string` | `A4` | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
-| `orientation` | `string` | `portrait` | Page orientation: `portrait` or `landscape` |
+
+| Field                  | Type     | Default                         | Description                                         |
+| ---------------------- | -------- | ------------------------------- | --------------------------------------------------- |
+| `markdown`             | `string` | Required                        | Markdown source to render                           |
+| `title`                | `string` | First `# Heading` or `Document` | HTML document title                                 |
+| `cwd`                  | `string` | `process.cwd()`                 | Base path used to resolve relative options          |
+| `baseDir` / `inputDir` | `string` | `.`                             | Base directory for relative asset links             |
+| `baseHref`             | `string` | Derived from `baseDir`          | Explicit `<base href>` value                        |
+| `cssPath` / `css`      | `string` | Disabled                        | CSS file path appended after the built-in styles    |
+| `paperSize`            | `string` | `A4`                            | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
+| `orientation`          | `string` | `portrait`                      | Page orientation: `portrait` or `landscape`         |
+
 
 ### Rendering notes
 
 - The title of each document is taken from the first Markdown `# Heading` when available.
 - If no top-level heading exists, the file name is converted into a readable title.
-- Mermaid fences using ```` ```mermaid ```` are rendered as diagrams.
-- Code fences using ```` ```text ```` are rendered with a plain text oriented layout.
+- Mermaid fences using ````mermaid` are rendered as diagrams.
+- Code fences using ````text` are rendered with a plain text oriented layout.
 - Task lists using `- [x]` and `- [ ]` are rendered with checkbox styling.
 - Footnotes using `[^name]` syntax are rendered at the end of the document.
 - GitHub-style callouts such as `> [!NOTE]` and `> [!WARNING]` are rendered as callout cards.
 - `[[TOC]]` is replaced with a generated table of contents linking to document headings.
 - Inline math using `$...$` and block math using `$$...$$` are rendered with KaTeX.
 - The generated PDFs use print CSS and support `--paper-size` plus `--orientation`.
+- A custom CSS file can be appended with `--css` or `cssPath` to override the built-in styles.
 - Render progress is always printed to the console.
 - Intermediate HTML files are skipped by default and are only persisted when `--html <dir>` is passed.
 - `<output>/README.md` is only written when `--manifest` is enabled.

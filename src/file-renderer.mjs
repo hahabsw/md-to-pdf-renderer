@@ -135,6 +135,7 @@ async function renderMarkdownSources({
     input=${inputLabel}
     output=${renderOptions.outputDir}
     html=${renderOptions.htmlDir ?? 'disabled'}
+    css=${renderOptions.cssPath ?? 'disabled'}
     paperSize=${renderOptions.paperLayout.sizeDisplayValue}
     orientation=${renderOptions.paperOrientation.displayValue}
     logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,

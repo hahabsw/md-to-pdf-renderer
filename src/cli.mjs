@@ -21,6 +21,7 @@ Options:
   --output-file <name>   PDF file name for single-file input. Example: guide.pdf
   --html <dir>           Also write intermediate HTML files to this directory. Default: disabled
   --manifest             Also write a README.md manifest file to the output directory. Default: disabled
+  --css <path>           Load a CSS file and append it last to override the built-in styles
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
   --log-file             Write progress logs to <output>/render.log
@@ -35,6 +36,7 @@ Examples:
   md-to-pdf-renderer --input docs --output pdf --manifest
   md-to-pdf-renderer --input docs/guide.md --output pdf --output-file guide-v2.pdf
   md-to-pdf-renderer --input docs --output pdf --html pdf/html
+  md-to-pdf-renderer --input docs --output pdf --css styles/print.css
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
 `.trimStart();
@@ -53,6 +55,7 @@ Examples:
  *   outputFile?: string,
  *   html?: string,
  *   manifest?: boolean,
+ *   css?: string,
  *   chromePath?: string,
  *   paperSize?: string,
  *   orientation?: string,
@@ -96,6 +99,12 @@ export function parseArgs(argv) {
 
         if (arg === '--manifest') {
             parsed.manifest = true;
+            continue;
+        }
+
+        if (arg === '--css') {
+            parsed.css = argv[i + 1];
+            i += 1;
             continue;
         }
 
@@ -157,6 +166,7 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
             outputFile: args.outputFile,
             html: args.html,
             manifest: args.manifest,
+            css: args.css,
             paperSize: args.paperSize,
             orientation: args.orientation,
             logFile: args.logFile,
