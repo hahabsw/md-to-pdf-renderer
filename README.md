@@ -87,6 +87,7 @@ When you run the renderer:
 - `markdown-it`
 - `markdown-it-footnote`
 - `markdown-it-task-lists`
+- `highlight.js`
 - `katex`
 - `mermaid`
 - `puppeteer`
