@@ -170,7 +170,7 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 | `--output-file` | PDF file name for single-file input only                                 | Source file name with `.pdf` |
 | `--html`        | Also write intermediate HTML files to this directory                     | Disabled                     |
 | `--manifest`    | Also write `<output>/README.md` manifest                                 | Disabled                     |
-| `--css`         | Append a CSS file after the built-in styles so it can override them      | Disabled                     |
+| `--css`         | Use an existing CSS file path or inline CSS text, appended after the built-in styles | Disabled                     |
 | `--paper-size`  | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4`                         |
 | `--orientation` | Print orientation: `portrait` or `landscape`                             | `portrait`                   |
 | `--log-file`    | Write progress logs to `<output>/render.log`                             | Disabled                     |
@@ -319,7 +319,7 @@ console.log(result.file.pdf); // Uint8Array
 | `cwd`                           | `string`        | `process.cwd()`              | Base path used to resolve relative options                         |
 | `inputFile` / `input`           | `string`        | Required                     | Markdown file to render                                            |
 | `outputFileName` / `outputFile` | `string`        | Source file name with `.pdf` | Custom PDF file name for returned metadata                         |
-| `cssPath` / `css`               | `string`        | Disabled                     | CSS file path appended after the built-in styles                   |
+| `cssPath` / `css`               | `string`        | Disabled                     | Existing CSS file path or inline CSS text appended after the built-in styles |
 | `paperSize`                     | `string`        | `A4`                         | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation`                   | `string`        | `portrait`                   | Page orientation: `portrait` or `landscape`                        |
 | `chromePath`                    | `string | null` | Auto-detect                  | Custom Chrome or Chromium executable                               |
@@ -351,7 +351,7 @@ console.log(result.file.pdf); // Uint8Array
 | `baseDir` / `inputDir`          | `string`        | `.`                             | Base directory for relative asset links                            |
 | `baseHref`                      | `string`        | Derived from `baseDir`          | Explicit `<base href>` value                                       |
 | `outputFileName` / `outputFile` | `string`        | Virtual file name with `.pdf`   | Custom PDF file name for returned metadata                         |
-| `cssPath` / `css`               | `string`        | Disabled                        | CSS file path appended after the built-in styles                   |
+| `cssPath` / `css`               | `string`        | Disabled                        | Existing CSS file path or inline CSS text appended after the built-in styles |
 | `paperSize`                     | `string`        | `A4`                            | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation`                   | `string`        | `portrait`                      | Page orientation: `portrait` or `landscape`                        |
 | `chromePath`                    | `string | null` | Auto-detect                     | Custom Chrome or Chromium executable                               |
@@ -391,7 +391,7 @@ console.log(result.file.pdf); // Uint8Array
 | `cwd`                  | `string` | `process.cwd()`                 | Base path used to resolve relative options          |
 | `baseDir` / `inputDir` | `string` | `.`                             | Base directory for relative asset links             |
 | `baseHref`             | `string` | Derived from `baseDir`          | Explicit `<base href>` value                        |
-| `cssPath` / `css`      | `string` | Disabled                        | CSS file path appended after the built-in styles    |
+| `cssPath` / `css`      | `string` | Disabled                        | Existing CSS file path or inline CSS text appended after the built-in styles |
 | `paperSize`            | `string` | `A4`                            | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
 | `orientation`          | `string` | `portrait`                      | Page orientation: `portrait` or `landscape`         |
 
@@ -408,7 +408,7 @@ console.log(result.file.pdf); // Uint8Array
 - `[[TOC]]` is replaced with a generated table of contents linking to document headings.
 - Inline math using `$...$` and block math using `$$...$$` are rendered with KaTeX.
 - The generated PDFs use print CSS and support `--paper-size` plus `--orientation`.
-- A custom CSS file can be appended with `--css` or `cssPath` to override the built-in styles.
+- `--css`, `cssPath`, and `css` accept either an existing CSS file path or inline CSS text for overriding the built-in styles.
 - Render progress is always printed to the console.
 - Intermediate HTML files are skipped by default and are only persisted when `--html <dir>` is passed.
 - `<output>/README.md` is only written when `--manifest` is enabled.

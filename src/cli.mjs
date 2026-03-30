@@ -21,7 +21,7 @@ Options:
   --output-file <name>   PDF file name for single-file input. Example: guide.pdf
   --html <dir>           Also write intermediate HTML files to this directory. Default: disabled
   --manifest             Also write a README.md manifest file to the output directory. Default: disabled
-  --css <path>           Load a CSS file and append it last to override the built-in styles
+  --css <value>          Use an existing CSS file path or inline CSS text and append it last
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
   --log-file             Write progress logs to <output>/render.log

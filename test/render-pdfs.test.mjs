@@ -56,7 +56,7 @@ test('prints help text', async () => {
     assert.match(result.stdout, /Usage:/);
     assert.match(result.stdout, /--html <dir>/);
     assert.match(result.stdout, /--manifest/);
-    assert.match(result.stdout, /--css <path>/);
+    assert.match(result.stdout, /--css <value>/);
     assert.match(result.stdout, /--input <path>/);
     assert.match(result.stdout, /Default: disabled/);
 });
@@ -343,6 +343,17 @@ test('applies CSS overrides from a provided file path', async () => {
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true });
     }
+});
+
+test('treats a non-path CSS option as inline CSS', async () => {
+    const html = await renderMarkdownToHtml({
+        markdown: '# Inline Styled Title',
+        baseDir: fixtureInputDir,
+        css: 'body { color: rgb(4, 5, 6); }\nh1 { letter-spacing: 0.2em; }',
+    });
+
+    assert.match(html, /body \{ color: rgb\(4, 5, 6\); \}/);
+    assert.match(html, /h1 \{ letter-spacing: 0.2em; \}/);
 });
 
 test('rejects invalid programmatic HTML render input', async () => {

@@ -135,7 +135,7 @@ async function renderMarkdownSources({
     input=${inputLabel}
     output=${renderOptions.outputDir}
     html=${renderOptions.htmlDir ?? 'disabled'}
-    css=${renderOptions.cssPath ?? 'disabled'}
+    css=${describeCssSource(renderOptions.css)}
     paperSize=${renderOptions.paperLayout.sizeDisplayValue}
     orientation=${renderOptions.paperOrientation.displayValue}
     logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,
@@ -239,6 +239,15 @@ async function renderSourceEntry({
         htmlPath: outputPaths.htmlPath,
         sourcePath: rendered.sourcePath,
     };
+}
+
+function describeCssSource(css) {
+    if (css == null || !String(css).trim()) {
+        return 'disabled';
+    }
+
+    const normalized = String(css).replace(/\s+/g, ' ').trim();
+    return normalized.length > 60 ? `${normalized.slice(0, 57)}...` : normalized;
 }
 
 function buildOutputPaths(renderOptions, fileName, pdfName) {

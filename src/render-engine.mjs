@@ -161,7 +161,7 @@ export async function renderMarkdownToHtml(options) {
         title: renderOptions.title,
         baseHref: renderOptions.baseHref,
         paperLayout: renderOptions.paperLayout,
-        cssOverride: await readOptionalFileUtf8(renderOptions.cssPath),
+        cssOverride: await resolveCssOverride(renderOptions.css, renderOptions.cwd),
     });
 }
 
@@ -212,7 +212,7 @@ export async function renderSourceToMemory({
         title,
         baseHref,
         paperLayout: renderOptions.paperLayout,
-        cssOverride: await readOptionalFileUtf8(renderOptions.cssPath),
+        cssOverride: await resolveCssOverride(renderOptions.css, renderOptions.cwd),
     });
     const pdf = await renderPdfBuffer(browser, {
         html,
@@ -299,12 +299,34 @@ async function readFileUtf8(filePath) {
     return readFile(filePath, 'utf8');
 }
 
-async function readOptionalFileUtf8(filePath) {
-    if (!filePath) {
+async function resolveCssOverride(cssOption, cwd) {
+    if (cssOption == null) {
         return '';
     }
 
-    return readFileUtf8(filePath);
+    const cssValue = String(cssOption);
+
+    if (!cssValue.trim()) {
+        return '';
+    }
+
+    const candidatePath = path.resolve(cwd, cssValue);
+
+    try {
+        const stats = await statFile(candidatePath);
+
+        if (!stats.isFile()) {
+            throw new Error(`CSS path is not a file: ${candidatePath}`);
+        }
+
+        return readFileUtf8(candidatePath);
+    } catch (error) {
+        if (error?.code === 'ENOENT') {
+            return cssValue;
+        }
+
+        throw error;
+    }
 }
 
 async function statFile(filePath) {
