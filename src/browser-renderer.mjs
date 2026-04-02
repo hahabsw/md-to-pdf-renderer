@@ -1,4 +1,7 @@
 import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer';
 
 export async function renderPdf(browser, { html, pdfPath, documentLabel }) {
@@ -8,9 +11,12 @@ export async function renderPdf(browser, { html, pdfPath, documentLabel }) {
 
 export async function renderPdfBuffer(browser, { html, documentLabel, waitForReadySignal = true }) {
     const page = await browser.newPage();
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'md-to-pdf-renderer-'));
+    const tempHtmlPath = path.join(tempDir, `${toSafeTempName(documentLabel)}.html`);
 
     try {
-        await page.setContent(html, {
+        await fs.writeFile(tempHtmlPath, html, 'utf8');
+        await page.goto(pathToFileURL(tempHtmlPath).href, {
             waitUntil: 'networkidle0',
         });
         await page.emulateMediaType('print');
@@ -30,6 +36,20 @@ export async function renderPdfBuffer(browser, { html, documentLabel, waitForRea
         }
 
         await page.evaluate(async () => {
+            const imageLoads = Array.from(document.images, (image) => {
+                if (image.complete) {
+                    return null;
+                }
+
+                return new Promise((resolve) => {
+                    const done = () => resolve();
+                    image.addEventListener('load', done, { once: true });
+                    image.addEventListener('error', done, { once: true });
+                });
+            }).filter(Boolean);
+
+            await Promise.all(imageLoads);
+
             if (document.fonts?.ready) {
                 await document.fonts.ready;
             }
@@ -41,6 +61,7 @@ export async function renderPdfBuffer(browser, { html, documentLabel, waitForRea
         });
     } finally {
         await page.close();
+        await fs.rm(tempDir, { recursive: true, force: true });
     }
 }
 
@@ -137,4 +158,14 @@ async function findSystemBrowser() {
     }
 
     return null;
+}
+
+function toSafeTempName(documentLabel) {
+    const normalized = String(documentLabel || 'document')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    return normalized || 'document';
 }

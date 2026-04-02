@@ -24,6 +24,7 @@ Options:
   --css <value>          Use an existing CSS file path or inline CSS text and append it last
   --paper-size <size>    Paper size such as A4, Letter, Legal, A3, or "210mm 297mm". Default: A4
   --orientation <mode>   Page orientation: portrait or landscape. Default: portrait
+  --font-size <preset>   Overall font size preset: xs, s, m, l, lg, xl. Default: m
   --log-file             Write progress logs to <output>/render.log
   --chrome-path <path>   Use a custom Chrome or Chromium executable instead of Puppeteer's bundled browser
   --help, -h             Show this help message
@@ -37,6 +38,7 @@ Examples:
   md-to-pdf-renderer --input docs/guide.md --output pdf --output-file guide-v2.pdf
   md-to-pdf-renderer --input docs --output pdf --html pdf/html
   md-to-pdf-renderer --input docs --output pdf --css styles/print.css
+  md-to-pdf-renderer --input docs --output pdf --font-size lg
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
 `.trimStart();
@@ -59,6 +61,7 @@ Examples:
  *   chromePath?: string,
  *   paperSize?: string,
  *   orientation?: string,
+ *   fontSize?: string,
  *   logFile?: boolean,
  * }}
  */
@@ -126,6 +129,12 @@ export function parseArgs(argv) {
             continue;
         }
 
+        if (arg === '--font-size') {
+            parsed.fontSize = argv[i + 1];
+            i += 1;
+            continue;
+        }
+
         if (arg === '--log-file') {
             parsed.logFile = true;
         }
@@ -169,6 +178,7 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
             css: args.css,
             paperSize: args.paperSize,
             orientation: args.orientation,
+            fontSize: args.fontSize,
             logFile: args.logFile,
             chromePath: args.chromePath,
             onProgress: (message) => {

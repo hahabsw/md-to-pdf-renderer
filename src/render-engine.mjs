@@ -71,6 +71,8 @@ export async function renderHtmlToPdf(options = {}) {
  * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @param {string} [options.fontSizePreset='m'] Overall typography preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`.
+ * @param {string} [options.fontSize] Alias for `fontSizePreset`.
  * @returns {Promise<RenderFileToPdfResult>}
  */
 export async function renderMarkdownFileToPdf(options = {}) {
@@ -112,6 +114,8 @@ export async function renderMarkdownFileToPdf(options = {}) {
  * @param {string | null} [options.chromePath=null] Optional Chrome or Chromium executable path.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @param {string} [options.fontSizePreset='m'] Overall typography preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`.
+ * @param {string} [options.fontSize] Alias for `fontSizePreset`.
  * @returns {Promise<RenderStringToPdfResult>}
  */
 export async function renderMarkdownStringToPdf(options = {}) {
@@ -151,6 +155,8 @@ export async function renderMarkdownStringToPdf(options = {}) {
  * @param {string} [options.css] Alias for `cssPath`.
  * @param {string} [options.paperSize='A4'] Paper size such as `A4`, `Letter`, or `210mm 297mm`.
  * @param {string} [options.orientation='portrait'] Page orientation, either `portrait` or `landscape`.
+ * @param {string} [options.fontSizePreset='m'] Overall typography preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`.
+ * @param {string} [options.fontSize] Alias for `fontSizePreset`.
  * @returns {Promise<string>}
  */
 export async function renderMarkdownToHtml(options) {
@@ -161,6 +167,7 @@ export async function renderMarkdownToHtml(options) {
         title: renderOptions.title,
         baseHref: renderOptions.baseHref,
         paperLayout: renderOptions.paperLayout,
+        fontSizePreset: renderOptions.fontSizePreset,
         cssOverride: await resolveCssOverride(renderOptions.css, renderOptions.cwd),
     });
 }
@@ -212,6 +219,7 @@ export async function renderSourceToMemory({
         title,
         baseHref,
         paperLayout: renderOptions.paperLayout,
+        fontSizePreset: renderOptions.fontSizePreset,
         cssOverride: await resolveCssOverride(renderOptions.css, renderOptions.cwd),
     });
     const pdf = await renderPdfBuffer(browser, {

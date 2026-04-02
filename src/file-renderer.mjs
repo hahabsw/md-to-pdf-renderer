@@ -138,6 +138,7 @@ async function renderMarkdownSources({
     css=${describeCssSource(renderOptions.css)}
     paperSize=${renderOptions.paperLayout.sizeDisplayValue}
     orientation=${renderOptions.paperOrientation.displayValue}
+    fontSize=${renderOptions.fontSizePreset.displayValue}
     logFile=${renderOptions.logToFile ? renderOptions.renderLogPath : 'disabled'}`,
     );
 

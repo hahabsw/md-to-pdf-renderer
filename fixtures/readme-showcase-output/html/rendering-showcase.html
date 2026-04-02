@@ -135,6 +135,21 @@ code.hljs {
         --accent: #334155;
         --accent-soft: #e5e7eb;
         --shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        --font-scale: 0.9;
+        --font-size-h1: calc(22pt * var(--font-scale));
+        --font-size-h2: calc(16pt * var(--font-scale));
+        --font-size-h3: calc(12.5pt * var(--font-scale));
+        --font-size-h4: calc(11pt * var(--font-scale));
+        --font-size-body: calc(10.5pt * var(--font-scale));
+        --font-size-inline-code: calc(0.92em * var(--font-scale));
+        --font-size-code-label: calc(8.5pt * var(--font-scale));
+        --font-size-code-block: calc(9.2pt * var(--font-scale));
+        --font-size-text-block: calc(8.4pt * var(--font-scale));
+        --font-size-table: calc(9.2pt * var(--font-scale));
+        --font-size-callout-title: calc(8.8pt * var(--font-scale));
+        --font-size-toc-title: calc(9pt * var(--font-scale));
+        --font-size-footnote-ref: calc(0.72em * var(--font-scale));
+        --font-size-footnotes: calc(9.4pt * var(--font-scale));
     }
 
     * {
@@ -150,6 +165,7 @@ code.hljs {
         color: var(--ink);
         background: #f3f4f6;
         font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+        font-size: var(--font-size-body);
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -180,7 +196,7 @@ code.hljs {
 
     h1 {
         margin: 0 0 2.5mm;
-        font-size: 22pt;
+        font-size: var(--font-size-h1);
         line-height: 1.2;
         letter-spacing: -0.03em;
     }
@@ -189,24 +205,24 @@ code.hljs {
         margin: 11mm 0 4mm;
         padding-bottom: 2.2mm;
         border-bottom: 0.45mm solid #d1d5db;
-        font-size: 16pt;
+        font-size: var(--font-size-h2);
         line-height: 1.32;
     }
 
     h3 {
         margin: 8mm 0 3mm;
-        font-size: 12.5pt;
+        font-size: var(--font-size-h3);
         line-height: 1.4;
     }
 
     h4 {
         margin: 6mm 0 2mm;
-        font-size: 11pt;
+        font-size: var(--font-size-h4);
         line-height: 1.45;
     }
 
     p, li, blockquote {
-        font-size: 10.5pt;
+        font-size: var(--font-size-body);
         line-height: 1.8;
     }
 
@@ -261,7 +277,7 @@ code.hljs {
         background: #f3f4f6;
         color: #334155;
         font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', monospace;
-        font-size: 0.92em;
+        font-size: var(--font-size-inline-code);
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -270,6 +286,9 @@ code.hljs {
     pre code {
         padding: 0;
         background: transparent;
+        white-space: inherit;
+        overflow-wrap: inherit;
+        word-break: normal;
     }
 
     .code-card,
@@ -292,7 +311,7 @@ code.hljs {
     .code-label,
     .diagram-card figcaption {
         padding: 3mm 4mm;
-        font-size: 8.5pt;
+        font-size: var(--font-size-code-label);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -310,7 +329,7 @@ code.hljs {
         color: #1f2937;
         background: #fcfcfd;
         font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', monospace;
-        font-size: 9.2pt;
+        font-size: var(--font-size-code-block);
         line-height: 1.65;
     }
 
@@ -327,7 +346,7 @@ code.hljs {
         overflow-wrap: normal;
         word-break: normal;
         white-space: pre;
-        font-size: 8.4pt;
+        font-size: var(--font-size-text-block);
         line-height: 1.5;
     }
 
@@ -382,7 +401,7 @@ code.hljs {
     }
 
     th, td {
-        font-size: 9.2pt;
+        font-size: var(--font-size-table);
         line-height: 1.55;
         padding: 3.4mm 3.6mm;
         vertical-align: top;
@@ -436,7 +455,7 @@ code.hljs {
 
     .callout-title {
         padding: 3.2mm 5mm 2.4mm;
-        font-size: 8.8pt;
+        font-size: var(--font-size-callout-title);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -493,7 +512,7 @@ code.hljs {
     .toc-title {
         margin: 0 0 2.2mm;
         color: #0f172a;
-        font-size: 9pt;
+        font-size: var(--font-size-toc-title);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -588,7 +607,7 @@ code.hljs {
 
     sup.footnote-ref {
         margin-left: 0.8mm;
-        font-size: 0.72em;
+        font-size: var(--font-size-footnote-ref);
         vertical-align: super;
     }
 
@@ -609,7 +628,7 @@ code.hljs {
     }
 
     .footnotes li {
-        font-size: 9.4pt;
+        font-size: var(--font-size-footnotes);
         line-height: 1.65;
     }
 
@@ -691,7 +710,7 @@ code.hljs {
                         secondaryColor: '#eff6ff',
                         tertiaryColor: '#fff7ed',
                         fontFamily: 'Noto Sans KR, Malgun Gothic, Apple SD Gothic Neo, sans-serif',
-                        fontSize: '12px',
+                        fontSize: '11px',
                     },
                     flowchart: {
                         curve: 'basis',
@@ -774,10 +793,10 @@ code.hljs {
 <p>The renderer supports GitHub-style callouts, task lists, Mermaid, tables, images, and math in one document.</p>
 </aside>
 <ul class="contains-task-list">
-<li class="task-list-item enabled"><input class="task-list-item-checkbox" checked=""type="checkbox" id="task-item-6079183"><label class="task-list-item-label" for="task-item-6079183"> Markdown heading parsing</label></li>
-<li class="task-list-item enabled"><input class="task-list-item-checkbox" checked=""type="checkbox" id="task-item-3215163"><label class="task-list-item-label" for="task-item-3215163"> Styled block rendering</label></li>
-<li class="task-list-item enabled"><input class="task-list-item-checkbox" checked=""type="checkbox" id="task-item-9809309"><label class="task-list-item-label" for="task-item-9809309"> PDF generation</label></li>
-<li class="task-list-item enabled"><input class="task-list-item-checkbox"type="checkbox" id="task-item-1135470"><label class="task-list-item-label" for="task-item-1135470"> Manual visual review</label></li>
+<li class="task-list-item enabled"><input class="task-list-item-checkbox" checked=""type="checkbox" id="task-item-2102049"><label class="task-list-item-label" for="task-item-2102049"> Markdown heading parsing</label></li>
+<li class="task-list-item enabled"><input class="task-list-item-checkbox" checked=""type="checkbox" id="task-item-9005667"><label class="task-list-item-label" for="task-item-9005667"> Styled block rendering</label></li>
+<li class="task-list-item enabled"><input class="task-list-item-checkbox" checked=""type="checkbox" id="task-item-1218929"><label class="task-list-item-label" for="task-item-1218929"> PDF generation</label></li>
+<li class="task-list-item enabled"><input class="task-list-item-checkbox"type="checkbox" id="task-item-4921965"><label class="task-list-item-label" for="task-item-4921965"> Manual visual review</label></li>
 </ul>
 <h2 id="table-and-quote">Table And Quote</h2>
 <table>

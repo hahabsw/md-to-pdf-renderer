@@ -57,6 +57,7 @@ test('prints help text', async () => {
     assert.match(result.stdout, /--html <dir>/);
     assert.match(result.stdout, /--manifest/);
     assert.match(result.stdout, /--css <value>/);
+    assert.match(result.stdout, /--font-size <preset>/);
     assert.match(result.stdout, /--input <path>/);
     assert.match(result.stdout, /Default: disabled/);
 });
@@ -88,6 +89,7 @@ test('parses CLI arguments for programmatic consumers', () => {
         '--css', 'styles/print.css',
         '--paper-size', 'Letter',
         '--orientation', 'landscape',
+        '--font-size', 'lg',
         '--chrome-path', '/usr/bin/chromium',
         '--log-file',
     ]);
@@ -101,6 +103,7 @@ test('parses CLI arguments for programmatic consumers', () => {
         css: 'styles/print.css',
         paperSize: 'Letter',
         orientation: 'landscape',
+        fontSize: 'lg',
         chromePath: '/usr/bin/chromium',
         logFile: true,
     });
@@ -325,6 +328,28 @@ test('renders HTML through the library API with computed defaults', async () => 
     assert.match(html, /<h2 id="section">Section<\/h2>/);
 });
 
+test('applies the requested font size preset to generated HTML', async () => {
+    const html = await renderMarkdownToHtml({
+        markdown: '# Sized Title\n\nBody text',
+        baseDir: fixtureInputDir,
+        fontSizePreset: 'lg',
+    });
+
+    assert.match(html, /--font-scale:\s*1\.16;/);
+    assert.match(html, /fontSize: '14px'/);
+});
+
+test('supports fontSize as an alias for fontSizePreset', async () => {
+    const html = await renderMarkdownToHtml({
+        markdown: '# Alias Title\n\nBody text',
+        baseDir: fixtureInputDir,
+        fontSize: 'xs',
+    });
+
+    assert.match(html, /--font-scale:\s*0\.82;/);
+    assert.match(html, /fontSize: '10px'/);
+});
+
 test('renders fenced code blocks with syntax highlighting', async () => {
     const html = await renderMarkdownToHtml({
         markdown: [
@@ -340,6 +365,7 @@ test('renders fenced code blocks with syntax highlighting', async () => {
     assert.match(html, /class="hljs language-js"/);
     assert.match(html, /hljs-keyword/);
     assert.match(html, /hljs-variable/);
+    assert.match(html, /pre code \{\s*padding: 0;\s*background: transparent;\s*white-space: inherit;/);
 });
 
 test('applies CSS overrides from a provided file path', async () => {
@@ -371,6 +397,17 @@ test('treats a non-path CSS option as inline CSS', async () => {
 
     assert.match(html, /body \{ color: rgb\(4, 5, 6\); \}/);
     assert.match(html, /h1 \{ letter-spacing: 0.2em; \}/);
+});
+
+test('rejects an invalid font size preset', async () => {
+    await assert.rejects(
+        renderMarkdownToHtml({
+            markdown: '# Invalid Font Size',
+            baseDir: fixtureInputDir,
+            fontSizePreset: 'huge',
+        }),
+        /Invalid font size preset: huge\. Use one of "xs", "s", "m", "l", "lg", or "xl"\./,
+    );
 });
 
 test('rejects invalid programmatic HTML render input', async () => {

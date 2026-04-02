@@ -15,7 +15,14 @@ const mermaidVersion = require('mermaid/package.json').version;
 const mermaidModuleUrl = `https://cdn.jsdelivr.net/npm/mermaid@${mermaidVersion}/dist/mermaid.esm.min.mjs`;
 let rendererResourcesPromise;
 
-export async function renderMarkdownDocument({ markdown, title, baseHref, paperLayout, cssOverride = '' }) {
+export async function renderMarkdownDocument({
+    markdown,
+    title,
+    baseHref,
+    paperLayout,
+    fontSizePreset = resolveFontSizePreset(),
+    cssOverride = '',
+}) {
     const { md, katexCss, highlightCss } = await getRendererResources();
 
     return buildHtml({
@@ -27,6 +34,7 @@ export async function renderMarkdownDocument({ markdown, title, baseHref, paperL
         md,
         mermaidModuleUrl,
         paperLayout,
+        fontSizePreset,
         cssOverride,
     });
 }
@@ -88,6 +96,24 @@ export function resolvePaperLayout(value = 'A4', orientation = resolvePaperOrien
         pageWidth: orientation.isLandscape ? '297mm' : '210mm',
         sizeDisplayValue: value,
     };
+}
+
+export function resolveFontSizePreset(value = 'm') {
+    const normalized = String(value ?? 'm').trim().toLowerCase();
+    const presets = {
+        xs: { scale: 0.82, mermaidFontSizePx: 10, displayValue: 'xs' },
+        s: { scale: 0.9, mermaidFontSizePx: 11, displayValue: 's' },
+        m: { scale: 1, mermaidFontSizePx: 12, displayValue: 'm' },
+        l: { scale: 1.08, mermaidFontSizePx: 13, displayValue: 'l' },
+        lg: { scale: 1.16, mermaidFontSizePx: 14, displayValue: 'lg' },
+        xl: { scale: 1.24, mermaidFontSizePx: 15, displayValue: 'xl' },
+    };
+
+    if (presets[normalized]) {
+        return presets[normalized];
+    }
+
+    throw new Error(`Invalid font size preset: ${value}. Use one of "xs", "s", "m", "l", "lg", or "xl".`);
 }
 
 function createMarkdownRenderer() {
@@ -164,7 +190,18 @@ async function getRendererResources() {
     return rendererResourcesPromise;
 }
 
-function buildHtml({ markdown, title, baseHref, katexCss, highlightCss, md, mermaidModuleUrl, paperLayout, cssOverride }) {
+function buildHtml({
+    markdown,
+    title,
+    baseHref,
+    katexCss,
+    highlightCss,
+    md,
+    mermaidModuleUrl,
+    paperLayout,
+    fontSizePreset,
+    cssOverride,
+}) {
     const rendered = md.render(markdown);
 
     return `<!doctype html>
@@ -176,7 +213,7 @@ function buildHtml({ markdown, title, baseHref, katexCss, highlightCss, md, merm
     <base href="${escapeHtml(baseHref)}" />
     <style>${katexCss}</style>
     <style>${highlightCss}</style>
-    <style>${buildTemplateCss(paperLayout)}</style>
+    <style>${buildTemplateCss(paperLayout, fontSizePreset)}</style>
     ${cssOverride ? `<style>${cssOverride}</style>` : ''}
     <script type="module">
         import mermaid from '${mermaidModuleUrl}';
@@ -231,7 +268,7 @@ function buildHtml({ markdown, title, baseHref, katexCss, highlightCss, md, merm
                         secondaryColor: '#eff6ff',
                         tertiaryColor: '#fff7ed',
                         fontFamily: 'Noto Sans KR, Malgun Gothic, Apple SD Gothic Neo, sans-serif',
-                        fontSize: '12px',
+                        fontSize: '${fontSizePreset.mermaidFontSizePx}px',
                     },
                     flowchart: {
                         curve: 'basis',
@@ -300,7 +337,7 @@ function buildHtml({ markdown, title, baseHref, katexCss, highlightCss, md, merm
 </html>`;
 }
 
-function buildTemplateCss(paperLayout) {
+function buildTemplateCss(paperLayout, fontSizePreset) {
     return `
     :root {
         --ink: #1f2937;
@@ -311,6 +348,21 @@ function buildTemplateCss(paperLayout) {
         --accent: #334155;
         --accent-soft: #e5e7eb;
         --shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        --font-scale: ${fontSizePreset.scale};
+        --font-size-h1: calc(22pt * var(--font-scale));
+        --font-size-h2: calc(16pt * var(--font-scale));
+        --font-size-h3: calc(12.5pt * var(--font-scale));
+        --font-size-h4: calc(11pt * var(--font-scale));
+        --font-size-body: calc(10.5pt * var(--font-scale));
+        --font-size-inline-code: calc(0.92em * var(--font-scale));
+        --font-size-code-label: calc(8.5pt * var(--font-scale));
+        --font-size-code-block: calc(9.2pt * var(--font-scale));
+        --font-size-text-block: calc(8.4pt * var(--font-scale));
+        --font-size-table: calc(9.2pt * var(--font-scale));
+        --font-size-callout-title: calc(8.8pt * var(--font-scale));
+        --font-size-toc-title: calc(9pt * var(--font-scale));
+        --font-size-footnote-ref: calc(0.72em * var(--font-scale));
+        --font-size-footnotes: calc(9.4pt * var(--font-scale));
     }
 
     * {
@@ -326,6 +378,7 @@ function buildTemplateCss(paperLayout) {
         color: var(--ink);
         background: #f3f4f6;
         font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+        font-size: var(--font-size-body);
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -356,7 +409,7 @@ function buildTemplateCss(paperLayout) {
 
     h1 {
         margin: 0 0 2.5mm;
-        font-size: 22pt;
+        font-size: var(--font-size-h1);
         line-height: 1.2;
         letter-spacing: -0.03em;
     }
@@ -365,24 +418,24 @@ function buildTemplateCss(paperLayout) {
         margin: 11mm 0 4mm;
         padding-bottom: 2.2mm;
         border-bottom: 0.45mm solid #d1d5db;
-        font-size: 16pt;
+        font-size: var(--font-size-h2);
         line-height: 1.32;
     }
 
     h3 {
         margin: 8mm 0 3mm;
-        font-size: 12.5pt;
+        font-size: var(--font-size-h3);
         line-height: 1.4;
     }
 
     h4 {
         margin: 6mm 0 2mm;
-        font-size: 11pt;
+        font-size: var(--font-size-h4);
         line-height: 1.45;
     }
 
     p, li, blockquote {
-        font-size: 10.5pt;
+        font-size: var(--font-size-body);
         line-height: 1.8;
     }
 
@@ -437,7 +490,7 @@ function buildTemplateCss(paperLayout) {
         background: #f3f4f6;
         color: #334155;
         font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', monospace;
-        font-size: 0.92em;
+        font-size: var(--font-size-inline-code);
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -446,6 +499,9 @@ function buildTemplateCss(paperLayout) {
     pre code {
         padding: 0;
         background: transparent;
+        white-space: inherit;
+        overflow-wrap: inherit;
+        word-break: normal;
     }
 
     .code-card,
@@ -468,7 +524,7 @@ function buildTemplateCss(paperLayout) {
     .code-label,
     .diagram-card figcaption {
         padding: 3mm 4mm;
-        font-size: 8.5pt;
+        font-size: var(--font-size-code-label);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -486,7 +542,7 @@ function buildTemplateCss(paperLayout) {
         color: #1f2937;
         background: #fcfcfd;
         font-family: 'JetBrains Mono', 'D2Coding', 'Consolas', monospace;
-        font-size: 9.2pt;
+        font-size: var(--font-size-code-block);
         line-height: 1.65;
     }
 
@@ -503,7 +559,7 @@ function buildTemplateCss(paperLayout) {
         overflow-wrap: normal;
         word-break: normal;
         white-space: pre;
-        font-size: 8.4pt;
+        font-size: var(--font-size-text-block);
         line-height: 1.5;
     }
 
@@ -558,7 +614,7 @@ function buildTemplateCss(paperLayout) {
     }
 
     th, td {
-        font-size: 9.2pt;
+        font-size: var(--font-size-table);
         line-height: 1.55;
         padding: 3.4mm 3.6mm;
         vertical-align: top;
@@ -612,7 +668,7 @@ function buildTemplateCss(paperLayout) {
 
     .callout-title {
         padding: 3.2mm 5mm 2.4mm;
-        font-size: 8.8pt;
+        font-size: var(--font-size-callout-title);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -669,7 +725,7 @@ function buildTemplateCss(paperLayout) {
     .toc-title {
         margin: 0 0 2.2mm;
         color: #0f172a;
-        font-size: 9pt;
+        font-size: var(--font-size-toc-title);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -764,7 +820,7 @@ function buildTemplateCss(paperLayout) {
 
     sup.footnote-ref {
         margin-left: 0.8mm;
-        font-size: 0.72em;
+        font-size: var(--font-size-footnote-ref);
         vertical-align: super;
     }
 
@@ -785,7 +841,7 @@ function buildTemplateCss(paperLayout) {
     }
 
     .footnotes li {
-        font-size: 9.4pt;
+        font-size: var(--font-size-footnotes);
         line-height: 1.65;
     }
 

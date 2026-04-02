@@ -2,6 +2,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
     extractTitle,
+    resolveFontSizePreset,
     resolvePaperLayout,
     resolvePaperOrientation,
 } from './markdown-document.mjs';
@@ -35,6 +36,7 @@ export function resolveDocumentRenderOptions(options = {}) {
     const cwd = resolveCwd(options);
     const title = options.title?.trim() || extractTitle(options.markdown) || 'Document';
     const paperLayout = resolvePaperLayout(options.paperSize, resolvePaperOrientation(options.orientation));
+    const fontSizePreset = resolveFontSizePreset(options.fontSizePreset ?? options.fontSize);
 
     return {
         markdown: options.markdown,
@@ -42,6 +44,7 @@ export function resolveDocumentRenderOptions(options = {}) {
         cwd,
         baseHref: options.baseHref ?? toDirectoryHref(resolvePathOption(cwd, options.baseDir ?? options.inputDir ?? '.')),
         paperLayout,
+        fontSizePreset,
         css: options.cssPath ?? options.css ?? null,
     };
 }
@@ -101,6 +104,7 @@ function resolveRenderRuntimeOptions(options, cwd) {
     const outputDir = resolvePathOption(cwd, options.outputDir ?? options.output ?? '.');
     const htmlDir = resolveOptionalPathOption(cwd, options.htmlDir ?? options.html ?? null);
     const paperOrientation = resolvePaperOrientation(options.orientation);
+    const fontSizePreset = resolveFontSizePreset(options.fontSizePreset ?? options.fontSize);
 
     return {
         cwd,
@@ -115,6 +119,7 @@ function resolveRenderRuntimeOptions(options, cwd) {
         onProgress: typeof options.onProgress === 'function' ? options.onProgress : noopProgress,
         paperOrientation,
         paperLayout: resolvePaperLayout(options.paperSize, paperOrientation),
+        fontSizePreset,
     };
 }
 

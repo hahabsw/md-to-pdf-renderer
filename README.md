@@ -181,6 +181,7 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 | `--css`         | Use an existing CSS file path or inline CSS text, appended after the built-in styles | Disabled                     |
 | `--paper-size`  | Print paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` | `A4`                         |
 | `--orientation` | Print orientation: `portrait` or `landscape`                             | `portrait`                   |
+| `--font-size`   | Overall font size preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`             | `m`                          |
 | `--log-file`    | Write progress logs to `<output>/render.log`                             | Disabled                     |
 | `--chrome-path` | Optional path to a custom Chrome or Chromium executable                  | Bundled Puppeteer browser    |
 
@@ -330,6 +331,7 @@ console.log(result.file.pdf); // Uint8Array
 | `cssPath` / `css`               | `string`        | Disabled                     | Existing CSS file path or inline CSS text appended after the built-in styles |
 | `paperSize`                     | `string`        | `A4`                         | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation`                   | `string`        | `portrait`                   | Page orientation: `portrait` or `landscape`                        |
+| `fontSizePreset` / `fontSize`   | `string`        | `m`                          | Overall font size preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`       |
 | `chromePath`                    | `string | null` | Auto-detect                  | Custom Chrome or Chromium executable                               |
 
 
@@ -362,6 +364,7 @@ console.log(result.file.pdf); // Uint8Array
 | `cssPath` / `css`               | `string`        | Disabled                        | Existing CSS file path or inline CSS text appended after the built-in styles |
 | `paperSize`                     | `string`        | `A4`                            | Paper size such as `A4`, `Letter`, `Legal`, `A3`, or `210mm 297mm` |
 | `orientation`                   | `string`        | `portrait`                      | Page orientation: `portrait` or `landscape`                        |
+| `fontSizePreset` / `fontSize`   | `string`        | `m`                             | Overall font size preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`       |
 | `chromePath`                    | `string | null` | Auto-detect                     | Custom Chrome or Chromium executable                               |
 
 
@@ -402,6 +405,7 @@ console.log(result.file.pdf); // Uint8Array
 | `cssPath` / `css`      | `string` | Disabled                        | Existing CSS file path or inline CSS text appended after the built-in styles |
 | `paperSize`            | `string` | `A4`                            | Paper size such as `A4`, `Letter`, or `210mm 297mm` |
 | `orientation`          | `string` | `portrait`                      | Page orientation: `portrait` or `landscape`         |
+| `fontSizePreset` / `fontSize` | `string` | `m`                        | Overall font size preset: `xs`, `s`, `m`, `l`, `lg`, or `xl` |
 
 
 ### Rendering notes
@@ -417,6 +421,7 @@ console.log(result.file.pdf); // Uint8Array
 - `[[TOC]]` is replaced with a generated table of contents linking to document headings.
 - Inline math using `$...$` and block math using `$$...$$` are rendered with KaTeX.
 - The generated PDFs use print CSS and support `--paper-size` plus `--orientation`.
+- `--font-size`, `fontSizePreset`, and `fontSize` change the overall typography scale, including Mermaid diagram text.
 - `--css`, `cssPath`, and `css` accept either an existing CSS file path or inline CSS text for overriding the built-in styles.
 - Render progress is always printed to the console.
 - Intermediate HTML files are skipped by default and are only persisted when `--html <dir>` is passed.
