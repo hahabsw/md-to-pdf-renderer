@@ -79,6 +79,7 @@ When you run the renderer:
 - Node.js
 - `npm install` for this tool directory
 - No separate Chrome installation is required by default
+- On Apple Silicon Macs, use an arm64 build of Node.js. If Puppeteer warns about degraded performance, `node -p "process.arch"` should print `arm64`.
 - Network access for Mermaid ESM loading from jsDelivr at render time
 - Linux ARM boards may need a system Chromium or Chrome executable instead of Puppeteer's bundled browser
 
@@ -162,6 +163,12 @@ Linux ARM example:
 npx md-to-pdf-renderer --input input --output output --chrome-path /usr/bin/chromium
 ```
 
+macOS Chrome example:
+
+```bash
+npx md-to-pdf-renderer --input input --output output --chrome-path "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+```
+
 Run from the repository root:
 
 ```bash
@@ -184,6 +191,19 @@ node src/render-pdfs.mjs --input input --output output --paper-size A4 --orienta
 | `--font-size`   | Overall font size preset: `xs`, `s`, `m`, `l`, `lg`, or `xl`             | `m`                          |
 | `--log-file`    | Write progress logs to `<output>/render.log`                             | Disabled                     |
 | `--chrome-path` | Optional path to a custom Chrome or Chromium executable                  | Bundled Puppeteer browser    |
+
+
+### Apple Silicon macOS performance note
+
+If Puppeteer prints a degraded-performance warning on an Apple Silicon Mac, the usual cause is running an x64 build of Node.js under Rosetta. That makes Chrome run through Rosetta too, which can slow PDF rendering down significantly.
+
+Use an arm64 build of Node.js and confirm with:
+
+```bash
+node -p "process.arch"
+```
+
+It should print `arm64`.
 
 
 ### Output structure

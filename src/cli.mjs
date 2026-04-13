@@ -41,6 +41,11 @@ Examples:
   md-to-pdf-renderer --input docs --output pdf --font-size lg
   md-to-pdf-renderer --input docs --output pdf --paper-size Letter --orientation landscape --log-file
   md-to-pdf-renderer --input docs --output pdf --chrome-path /usr/bin/chromium
+  md-to-pdf-renderer --input docs --output pdf --chrome-path "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+Apple Silicon note:
+  If Puppeteer warns about degraded performance, run an arm64 build of Node.
+  node -p "process.arch" should print arm64 on Apple Silicon Macs.
 `.trimStart();
 }
 
@@ -183,6 +188,9 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
             chromePath: args.chromePath,
             onProgress: (message) => {
                 stdout.write(`${message}\n`);
+            },
+            onWarning: (message) => {
+                stderr.write(`${message}\n`);
             },
         });
         return 0;

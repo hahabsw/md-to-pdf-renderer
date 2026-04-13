@@ -16,6 +16,7 @@ import {
     renderMarkdownToHtml,
 } from '../src/render-pdfs.mjs';
 import * as publicApi from '../src/render-pdfs.mjs';
+import { getMacOsNodeArchitectureWarning } from '../src/browser-renderer.mjs';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = process.cwd();
@@ -60,6 +61,7 @@ test('prints help text', async () => {
     assert.match(result.stdout, /--font-size <preset>/);
     assert.match(result.stdout, /--input <path>/);
     assert.match(result.stdout, /Default: disabled/);
+    assert.match(result.stdout, /Apple Silicon note:/);
 });
 
 test('exports help text for library consumers', () => {
@@ -67,6 +69,28 @@ test('exports help text for library consumers', () => {
 
     assert.match(helpText, /md-to-pdf-renderer/);
     assert.match(helpText, /optional HTML output/);
+    assert.match(helpText, /process\.arch/);
+});
+
+test('reports a clear macOS Apple Silicon warning for x64 Node', () => {
+    const warning = getMacOsNodeArchitectureWarning({
+        platform: 'darwin',
+        arch: 'x64',
+        cpuModel: 'Apple M3 Max',
+    });
+
+    assert.match(warning, /x64 Node is running on Apple Silicon macOS/);
+    assert.match(warning, /node -p "process\.arch"/);
+});
+
+test('does not warn when Node already matches Apple Silicon architecture', () => {
+    const warning = getMacOsNodeArchitectureWarning({
+        platform: 'darwin',
+        arch: 'arm64',
+        cpuModel: 'Apple M3 Max',
+    });
+
+    assert.equal(warning, null);
 });
 
 test('exports only memory-oriented library rendering APIs', () => {

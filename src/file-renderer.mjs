@@ -119,6 +119,18 @@ function createLogger({ logToFile, renderLogPath, onProgress }) {
     };
 }
 
+function createWarningLogger({ logToFile, renderLogPath, onWarning }) {
+    return async (message) => {
+        const line = `[${new Date().toISOString()}] WARNING: ${message}\n`;
+
+        if (logToFile) {
+            await fs.appendFile(renderLogPath, line, 'utf8');
+        }
+
+        await onWarning(message);
+    };
+}
+
 async function renderMarkdownSources({
     renderOptions,
     inputLabel,
@@ -127,6 +139,7 @@ async function renderMarkdownSources({
     buildResult,
 }) {
     const logProgress = createLogger(renderOptions);
+    const logWarning = createWarningLogger(renderOptions);
 
     await prepareOutputDirectories(renderOptions);
 
@@ -161,6 +174,8 @@ async function renderMarkdownSources({
             }
 
             return files;
+        }, {
+            onWarning: logWarning,
         });
 
         await logProgress(`Rendered ${renderedFiles.length} PDF file(s).`);

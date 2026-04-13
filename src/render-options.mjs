@@ -117,6 +117,7 @@ function resolveRenderRuntimeOptions(options, cwd) {
         manifestPath: path.join(outputDir, 'README.md'),
         renderLogPath: path.join(outputDir, 'render.log'),
         onProgress: typeof options.onProgress === 'function' ? options.onProgress : noopProgress,
+        onWarning: typeof options.onWarning === 'function' ? options.onWarning : noopProgress,
         paperOrientation,
         paperLayout: resolvePaperLayout(options.paperSize, paperOrientation),
         fontSizePreset,

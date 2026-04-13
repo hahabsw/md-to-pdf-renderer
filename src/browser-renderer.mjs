@@ -65,8 +65,14 @@ export async function renderPdfBuffer(browser, { html, documentLabel, waitForRea
     }
 }
 
-export async function runWithBrowser(chromePath, callback) {
+export async function runWithBrowser(chromePath, callback, options = {}) {
     const launchOptions = await resolveBrowserLaunchOptions(chromePath);
+    const warning = getMacOsNodeArchitectureWarning();
+
+    if (warning && typeof options.onWarning === 'function') {
+        await options.onWarning(warning);
+    }
+
     const browser = await puppeteer.launch({
         ...launchOptions,
         headless: true,
@@ -77,6 +83,20 @@ export async function runWithBrowser(chromePath, callback) {
     } finally {
         await browser.close();
     }
+}
+
+export function getMacOsNodeArchitectureWarning(environment = getRuntimeEnvironment()) {
+    if (environment.platform !== 'darwin' || environment.arch !== 'x64') {
+        return null;
+    }
+
+    if (!String(environment.cpuModel ?? '').includes('Apple')) {
+        return null;
+    }
+
+    return 'md-to-pdf-renderer warning: x64 Node is running on Apple Silicon macOS. '
+        + 'Puppeteer will launch Chrome through Rosetta, which can make PDF rendering much slower. '
+        + 'Use an arm64 build of Node instead. Check with: node -p "process.arch"';
 }
 
 export async function resolveBrowserLaunchOptions(cliChromePath) {
@@ -135,6 +155,14 @@ function detectBrowserType(executablePath) {
     }
 
     return 'chrome';
+}
+
+function getRuntimeEnvironment() {
+    return {
+        platform: process.platform,
+        arch: process.arch,
+        cpuModel: os.cpus()[0]?.model ?? '',
+    };
 }
 
 async function findSystemBrowser() {

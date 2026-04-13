@@ -54,7 +54,9 @@ export async function renderHtmlToPdf(options = {}) {
         html: options.html,
         documentLabel: options.documentLabel ?? 'document.html',
         waitForReadySignal: false,
-    }));
+    }), {
+        onWarning: options.onWarning,
+    });
 }
 
 /**
@@ -92,7 +94,9 @@ export async function renderMarkdownFileToPdf(options = {}) {
             baseHref: toDirectoryHref(path.dirname(sourceFile)),
             renderOptions,
         }),
-    }));
+    }), {
+        onWarning: renderOptions.onWarning,
+    });
 }
 
 /**
@@ -136,7 +140,9 @@ export async function renderMarkdownStringToPdf(options = {}) {
             baseHref: renderOptions.baseHref,
             renderOptions,
         }),
-    }));
+    }), {
+        onWarning: renderOptions.onWarning,
+    });
 }
 
 /**
